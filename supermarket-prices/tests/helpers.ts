@@ -28,9 +28,9 @@ export function priceXml(chainId: string, sub: string, store: string, items: TIt
   return `<Root><ChainID>${chainId}</ChainID><SubChainID>${sub}</SubChainID><StoreID>${store}</StoreID><Items>${rows}</Items></Root>`;
 }
 
-export function storesXml(chainId: string, stores: Array<{ sub: string; id: string; name: string; city: string; address: string }>): string {
+export function storesXml(chainId: string, stores: Array<{ sub: string; id: string; name: string; city: string; address: string; type?: number }>): string {
   const body = stores
-    .map((s) => `<SubChain><SubChainID>${s.sub}</SubChainID><Stores><Store><StoreID>${s.id}</StoreID><StoreName>${s.name}</StoreName><Address>${s.address}</Address><City>${s.city}</City></Store></Stores></SubChain>`)
+    .map((s) => `<SubChain><SubChainID>${s.sub}</SubChainID><Stores><Store><StoreID>${s.id}</StoreID>${s.type ? `<StoreType>${s.type}</StoreType>` : ""}<StoreName>${s.name}</StoreName><Address>${s.address}</Address><City>${s.city}</City></Store></Stores></SubChain>`)
     .join("");
   return `<Root><ChainID>${chainId}</ChainID><SubChains>${body}</SubChains></Root>`;
 }

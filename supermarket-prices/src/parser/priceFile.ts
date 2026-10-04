@@ -131,6 +131,7 @@ export function parseStoresFile(buf: Buffer | string): StoreRecord[] {
         address: pick(s, "Address"),
         city: pick(s, "City"),
         zip: pick(s, "ZipCode"),
+        isOnline: pick(s, "StoreType")?.trim() === "2",
       });
     }
   }

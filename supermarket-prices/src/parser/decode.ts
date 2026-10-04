@@ -1,7 +1,34 @@
-import { gunzipSync } from "node:zlib";
+import { gunzipSync, inflateRawSync } from "node:zlib";
 
 export function isGzip(buf: Buffer): boolean {
   return buf.length > 2 && buf[0] === 0x1f && buf[1] === 0x8b;
+}
+
+export function isZip(buf: Buffer): boolean {
+  return buf.length > 4 && buf[0] === 0x50 && buf[1] === 0x4b && buf[2] === 0x03 && buf[3] === 0x04;
+}
+
+/**
+ * Reads the first entry of a ZIP archive. Rami Levy serves ZIP archives under a ".gz" name.
+ * Sizes come from the central directory because the local header may defer them to a data descriptor.
+ */
+export function unzipFirstEntry(buf: Buffer): Buffer {
+  let eocd = -1;
+  for (let i = buf.length - 22; i >= Math.max(0, buf.length - 22 - 65535); i--) {
+    if (buf.readUInt32LE(i) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error("ZIP: end of central directory not found");
+  const cd = buf.readUInt32LE(eocd + 16);
+  if (buf.readUInt32LE(cd) !== 0x02014b50) throw new Error("ZIP: bad central directory");
+  const method = buf.readUInt16LE(cd + 10);
+  const compSize = buf.readUInt32LE(cd + 20);
+  const local = buf.readUInt32LE(cd + 42);
+  if (buf.readUInt32LE(local) !== 0x04034b50) throw new Error("ZIP: bad local header");
+  const start = local + 30 + buf.readUInt16LE(local + 26) + buf.readUInt16LE(local + 28);
+  const data = buf.subarray(start, start + compSize);
+  if (method === 0) return Buffer.from(data);
+  if (method === 8) return inflateRawSync(data);
+  throw new Error(`ZIP: unsupported compression method ${method}`);
 }
 
 /**
@@ -13,6 +40,7 @@ export function isGzip(buf: Buffer): boolean {
 export function decodeXmlBuffer(input: Buffer): string {
   let buf = input;
   if (isGzip(buf)) buf = gunzipSync(buf);
+  else if (isZip(buf)) buf = unzipFirstEntry(buf);
   if (buf.length >= 2 && buf[0] === 0xff && buf[1] === 0xfe) return buf.subarray(2).toString("utf16le");
   if (buf.length >= 2 && buf[0] === 0xfe && buf[1] === 0xff) {
     const swapped = Buffer.from(buf.subarray(2));

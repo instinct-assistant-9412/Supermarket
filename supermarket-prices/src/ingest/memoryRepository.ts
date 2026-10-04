@@ -40,7 +40,7 @@ export class MemoryRepository implements Repository {
   }
   async ensureStore(chainId: string, sub: string, storeId: string) {
     const k = this.key(chainId, sub, storeId);
-    if (!this.stores.has(k)) this.stores.set(k, { chainId, subChainId: sub, storeId, name: null, address: null, city: null, zip: null, key: k });
+    if (!this.stores.has(k)) this.stores.set(k, { chainId, subChainId: sub, storeId, name: null, address: null, city: null, zip: null, isOnline: false, key: k });
     return k;
   }
   async getChainItem(chainId: string, itemCode: string) {
@@ -129,6 +129,7 @@ export class MemoryRepository implements Repository {
       .sort((a, b) => a.validFrom.getTime() - b.validFrom.getTime());
   }
   private inArea(s: StoreMem, area: StoreArea) {
+    if (s.isOnline !== (area.online ?? false)) return false;
     if (area.chainIds?.length && !area.chainIds.includes(s.chainId)) return false;
     if (area.storeKeys?.length && !area.storeKeys.includes(s.key)) return false;
     if (area.text) {
@@ -157,7 +158,7 @@ export class MemoryRepository implements Repository {
       if (found === 0 || (requireAll && missing.length)) continue;
       out.push({
         chainId: s.chainId, chainName: this.chains.get(s.chainId) ?? null, storeKey: s.key, storeName: s.name,
-        address: s.address, city: s.city, total: Math.round(total * 100) / 100, found, missingProductIds: missing,
+        address: s.address, city: s.city, isOnline: s.isOnline, total: Math.round(total * 100) / 100, found, missingProductIds: missing,
       });
     }
     return out.sort((a, b) => b.found - a.found || a.total - b.total).slice(0, limit);

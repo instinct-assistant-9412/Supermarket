@@ -34,6 +34,8 @@ export interface StoreRecord {
   /** Some chains publish a CBS city code here (e.g. "3000"), others a name. Kept raw. */
   city: string | null;
   zip: string | null;
+  /** StoreType=2 in the Stores file: an online/delivery store (its prices differ from physical branches) */
+  isOnline: boolean;
 }
 
 export type FileKind = "price" | "pricefull" | "promo" | "promofull" | "stores" | "unknown";

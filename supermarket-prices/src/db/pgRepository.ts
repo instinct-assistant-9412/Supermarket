@@ -27,12 +27,12 @@ export class PgRepository implements Repository {
     for (const s of stores) {
       await this.upsertChain(s.chainId, null);
       await this.pool.query(
-        `INSERT INTO stores (chain_id, sub_chain_id, store_id, name, address, city, zip, search_text)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+        `INSERT INTO stores (chain_id, sub_chain_id, store_id, name, address, city, zip, search_text, is_online)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
          ON CONFLICT (chain_id, sub_chain_id, store_id)
          DO UPDATE SET name = EXCLUDED.name, address = EXCLUDED.address, city = EXCLUDED.city,
-                       zip = EXCLUDED.zip, search_text = EXCLUDED.search_text`,
-        [s.chainId, s.subChainId, s.storeId, s.name, s.address, s.city, s.zip, searchText(s)],
+                       zip = EXCLUDED.zip, search_text = EXCLUDED.search_text, is_online = EXCLUDED.is_online`,
+        [s.chainId, s.subChainId, s.storeId, s.name, s.address, s.city, s.zip, searchText(s), s.isOnline],
       );
     }
   }
@@ -209,7 +209,7 @@ export class PgRepository implements Repository {
          JOIN chain_items ci ON ci.chain_id = cp.chain_id AND ci.item_code = cp.item_code
          WHERE ci.product_id = ANY($1::int[])
          GROUP BY cp.store_pk, ci.product_id)
-       SELECT s.id, s.chain_id, c.name AS chain_name, s.name, s.address, s.city,
+       SELECT s.id, s.chain_id, c.name AS chain_name, s.name, s.address, s.city, s.is_online,
               sum(b.price * w.qty) AS total, count(*) AS found,
               ARRAY(SELECT w2.product_id FROM want w2 WHERE NOT EXISTS
                 (SELECT 1 FROM best b2 WHERE b2.store_pk = s.id AND b2.product_id = w2.product_id)) AS missing
@@ -218,16 +218,17 @@ export class PgRepository implements Repository {
        WHERE ($3::text IS NULL OR s.search_text LIKE '%' || $3 || '%')
          AND ($4::text[] IS NULL OR s.chain_id = ANY($4))
          AND ($5::int[] IS NULL OR s.id = ANY($5))
+         AND s.is_online = $9  -- online and physical stores are never compared in the same answer
        GROUP BY s.id, s.chain_id, c.name
        HAVING ($6::boolean = false OR count(*) = $7)
        ORDER BY count(*) DESC, sum(b.price * w.qty) ASC
        LIMIT $8`,
       [ids, qtys, area.text ? normalizeHebrew(area.text) : null, area.chainIds?.length ? area.chainIds : null,
-       area.storeKeys?.length ? area.storeKeys.map(Number) : null, requireAll, lines.length, limit],
+       area.storeKeys?.length ? area.storeKeys.map(Number) : null, requireAll, lines.length, limit, area.online ?? false],
     );
     return r.rows.map((x) => ({
       chainId: x.chain_id, chainName: x.chain_name, storeKey: String(x.id), storeName: x.name, address: x.address,
-      city: x.city, total: Math.round(Number(x.total) * 100) / 100, found: Number(x.found), missingProductIds: x.missing,
+      city: x.city, isOnline: x.is_online === true, total: Math.round(Number(x.total) * 100) / 100, found: Number(x.found), missingProductIds: x.missing,
     }));
   }
 

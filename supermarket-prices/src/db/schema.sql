@@ -15,9 +15,11 @@ CREATE TABLE IF NOT EXISTS stores (
   address      text,
   city         text,            -- raw: a name or a CBS city code, depends on the chain
   zip          text,
+  is_online    boolean NOT NULL DEFAULT false, -- StoreType=2 in the Stores file
   search_text  text,            -- normalized name + address + city, for area filtering
   UNIQUE (chain_id, sub_chain_id, store_id)
 );
+ALTER TABLE stores ADD COLUMN IF NOT EXISTS is_online boolean NOT NULL DEFAULT false;
 CREATE INDEX IF NOT EXISTS stores_search_trgm ON stores USING gin (search_text gin_trgm_ops);
 
 -- one row per real-world product; gtin is NULL for products that only exist under chain internal codes

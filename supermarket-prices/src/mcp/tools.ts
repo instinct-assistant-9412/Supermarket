@@ -35,15 +35,16 @@ export function buildMcpServer(service: PriceService, config: Pick<Config, "maxF
 
   server.tool(
     "cheapest_basket",
-    "Find the cheapest stores for a shopping basket in an area. Items are barcodes or Hebrew names with quantities; area is free text matched against store city/address/name.",
+    "Find the cheapest stores for a shopping basket in an area. Items are barcodes or Hebrew names with quantities; area is free text matched against store city/address/name. Physical branches and online stores are never mixed: online=true compares only online stores (default: only physical branches).",
     {
       items: z.array(z.object({ gtin: z.string().optional(), query: z.string().optional(), qty: z.number().positive().optional() })).min(1).max(100),
       area: z.string().optional(),
       chain_ids: z.array(z.string()).optional(),
+      online: z.boolean().optional(),
       limit: z.number().int().min(1).max(20).optional(),
       require_all: z.boolean().optional(),
     },
-    async (a) => text(await service.cheapestBasket(a.items, { text: a.area, chainIds: a.chain_ids }, { limit: a.limit, requireAll: a.require_all })),
+    async (a) => text(await service.cheapestBasket(a.items, { text: a.area, chainIds: a.chain_ids, online: a.online }, { limit: a.limit, requireAll: a.require_all })),
   );
 
   server.tool("data_freshness", "Per-chain freshness of the stored price data (fresh / stale / never).", {}, async () =>

@@ -2,7 +2,7 @@ import type { Config } from "../config.js";
 import { matchItem } from "../normalize/matcher.js";
 import { checkFile } from "../quality/checks.js";
 import { parsePriceFile, parseStoresFile } from "../parser/priceFile.js";
-import type { ChainSource, FileKind, PriceFile, RemoteFile } from "../types.js";
+import type { ChainSource, FileKind, PriceFile, RemoteFile, StoreRecord } from "../types.js";
 import type { IngestRunInfo, PriceWrite, Repository } from "./repository.js";
 
 export interface IngestOptions {
@@ -90,6 +90,23 @@ export interface SourceIngestSummary {
   runs: IngestRunInfo[];
 }
 
+const stripZeros = (id: string) => id.replace(/^0+(?=\d)/, "");
+
+/**
+ * Some chains publish a different StoreID inside the file than in its name (Carrefour online:
+ * file name 471, XML field 530). The file name is what the Stores file and the directory agree on,
+ * so it wins when the two differ numerically (zero padding alone is normalized silently).
+ */
+export function reconcileStoreId(parsed: PriceFile, file: RemoteFile): { file: PriceFile; note: string | null } {
+  if (!file.storeId || file.storeId === parsed.storeId) return { file: parsed, note: null };
+  // only zero padding differs (Rami Levy: "39" in the XML, "039" in the name and Stores file): same store, keep the Stores spelling
+  if (stripZeros(file.storeId) === stripZeros(parsed.storeId)) return { file: { ...parsed, storeId: file.storeId }, note: null };
+  return {
+    file: { ...parsed, storeId: file.storeId, subChainId: file.subChainId ?? parsed.subChainId },
+    note: `STORE_ID_FROM_FILENAME: StoreID בקובץ (${parsed.storeId}) שונה משם הקובץ (${file.storeId}); נעשה שימוש בשם הקובץ`,
+  };
+}
+
 /** Keeps only the newest file per store (for price kinds). */
 export function latestPerStore(files: RemoteFile[]): RemoteFile[] {
   const best = new Map<string, RemoteFile>();
@@ -104,25 +121,33 @@ export function latestPerStore(files: RemoteFile[]): RemoteFile[] {
 export async function ingestSource(
   repo: Repository,
   source: ChainSource,
-  opts: IngestOptions & { kinds?: FileKind[]; maxFiles?: number; expectedChainId?: string | null },
+  opts: IngestOptions & { kinds?: FileKind[]; maxFiles?: number; expectedChainId?: string | null; onlineOnly?: boolean },
 ): Promise<SourceIngestSummary> {
   const kinds = opts.kinds ?? ["pricefull"];
   const summary: SourceIngestSummary = { source: source.key, filesSeen: 0, filesIngested: 0, filesSkipped: 0, failures: [], runs: [] };
   const listed = await source.listFiles([...kinds, "stores"]);
   summary.filesSeen = listed.length;
 
+  const onlineStoreIds = new Set<string>();
+  const canonical = new Map<string, StoreRecord>(); // chain:sub:store without zero padding -> the Stores file spelling
   const storeFiles = latestPerStore(listed.filter((f) => f.kind === "stores"));
   for (const sf of storeFiles) {
     try {
       const stores = parseStoresFile(await source.download(sf));
       await repo.upsertChain(stores[0]?.chainId ?? sf.chainId ?? source.key, source.name);
       await repo.upsertStores(stores);
+      for (const s of stores) canonical.set(`${s.chainId}:${stripZeros(s.subChainId)}:${stripZeros(s.storeId)}`, s);
+      for (const s of stores) if (s.isOnline) onlineStoreIds.add(`${s.chainId}:${stripZeros(s.storeId)}`);
     } catch (e) {
       summary.failures.push({ file: sf.name, error: (e as Error).message });
     }
   }
 
   let priceFiles = latestPerStore(listed.filter((f) => kinds.includes(f.kind)));
+  if (opts.onlineOnly) {
+    // only stores the Stores file marks as StoreType=2; without a readable Stores file nothing is ingested
+    priceFiles = priceFiles.filter((f) => f.chainId && f.storeId && onlineStoreIds.has(`${f.chainId}:${stripZeros(f.storeId)}`));
+  }
   if (opts.maxFiles) priceFiles = priceFiles.slice(0, opts.maxFiles);
   for (const f of priceFiles) {
     if (await repo.hasIngestedFile(f.name)) {
@@ -130,8 +155,12 @@ export async function ingestSource(
       continue;
     }
     try {
-      const parsed = parsePriceFile(await source.download(f));
+      const { file: reconciled, note } = reconcileStoreId(parsePriceFile(await source.download(f)), f);
+      // "1"/"39" in the XML vs "001"/"039" in the Stores file are the same store: use one spelling
+      const known = canonical.get(`${reconciled.chainId}:${stripZeros(reconciled.subChainId)}:${stripZeros(reconciled.storeId)}`);
+      const parsed = known ? { ...reconciled, subChainId: known.subChainId, storeId: known.storeId } : reconciled;
       const run = await ingestPriceFile(repo, parsed, { fileName: f.name, fileTime: f.publishedAt, expectedChainId: opts.expectedChainId ?? f.chainId, chainName: source.name }, opts);
+      if (note) run.issues.push(note);
       summary.runs.push(run);
       summary.filesIngested++;
     } catch (e) {

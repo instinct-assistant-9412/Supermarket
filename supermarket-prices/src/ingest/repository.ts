@@ -58,6 +58,8 @@ export interface StoreArea {
   text?: string;
   chainIds?: string[];
   storeKeys?: string[];
+  /** true = only online stores (StoreType=2), false/omitted = only physical branches. Never mixed. */
+  online?: boolean;
 }
 
 export interface BasketLine {
@@ -72,6 +74,7 @@ export interface BasketStoreResult {
   storeName: string | null;
   address: string | null;
   city: string | null;
+  isOnline: boolean;
   total: number;
   found: number;
   missingProductIds: number[];

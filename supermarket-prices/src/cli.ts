@@ -29,7 +29,7 @@ async function main() {
       if (sources.length === 0) throw new Error(`unknown chain: ${chain}`);
       for (const s of sources) {
         try {
-          const sum = await ingestSource(repo, s, { config, kinds: [...kinds], maxFiles });
+          const sum = await ingestSource(repo, s, { config, kinds: [...kinds], maxFiles, onlineOnly: args.includes("--online") });
           console.log(`${s.key}: ingested ${sum.filesIngested}, skipped ${sum.filesSkipped}, failures ${sum.failures.length}`);
           for (const r of sum.runs.filter((x) => x.issues.length)) console.log(`  ${r.fileName}: ${r.issues.join(" | ")}`);
           for (const f of sum.failures) console.log(`  FAIL ${f.file}: ${f.error}`);
