@@ -1,6 +1,8 @@
 import type { ChainSource } from "../types.js";
 import type { HttpOptions } from "./http.js";
 import { PublishedPricesSource, type PublishedPricesChain } from "./publishedPrices.js";
+import { CarrefourSource } from "./carrefour.js";
+import { VictorySource } from "./victory.js";
 import { ShufersalSource } from "./shufersal.js";
 
 /**
@@ -20,7 +22,7 @@ export const PUBLISHED_PRICES_CHAINS: PublishedPricesChain[] = [
 ];
 
 export function allSources(http: HttpOptions): ChainSource[] {
-  return [new ShufersalSource(http), ...PUBLISHED_PRICES_CHAINS.map((c) => new PublishedPricesSource(c, http))];
+  return [new ShufersalSource(http), new CarrefourSource(http), new VictorySource(http), ...PUBLISHED_PRICES_CHAINS.map((c) => new PublishedPricesSource(c, http))];
 }
 
 export function sourceByKey(key: string, http: HttpOptions): ChainSource | undefined {

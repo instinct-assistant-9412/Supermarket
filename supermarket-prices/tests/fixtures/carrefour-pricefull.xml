@@ -1,0 +1,47 @@
+<Root>
+  <ChainID>7290055700007</ChainID>
+  <SubChainID>001</SubChainID>
+  <StoreID>002</StoreID>
+  <BikoretNo>1</BikoretNo>
+  <Items>
+    <Item>
+      <PriceUpdateTime>2026-03-10T12:50:24.000</PriceUpdateTime>
+      <ItemCode>7290017105383</ItemCode>
+      <LastSaleDateTime>2026-09-10T11:18:07.000</LastSaleDateTime>
+      <ItemType>1</ItemType>
+      <ItemName>גרעיני תירס מתוק ליל</ItemName>
+      <ManufactureName>זנלכל</ManufactureName>
+      <ManufactureCountry>ישראל</ManufactureCountry>
+      <ManufactureItemDescription>גרעיני תירס מתוק ליל</ManufactureItemDescription>
+      <UnitQty>גרם</UnitQty>
+      <Quantity>600.00</Quantity>
+      <UnitOfMeasure>100 גרם</UnitOfMeasure>
+      <bIsWeighted>0</bIsWeighted>
+      <QtyInPackage>לא ידוע</QtyInPackage>
+      <ItemPrice>16.90</ItemPrice>
+      <UnitOfMeasurePrice>2.82</UnitOfMeasurePrice>
+      <AllowDiscount>1</AllowDiscount>
+      <ItemStatus/>
+    </Item>
+    <Item>
+      <PriceUpdateTime>2025-10-23T13:58:36.000</PriceUpdateTime>
+      <ItemCode>7290018359556</ItemCode>
+      <LastSaleDateTime>2026-10-02T14:14:30.000</LastSaleDateTime>
+      <ItemType>1</ItemType>
+      <ItemName>תירס מהשדה יכין 400</ItemName>
+      <ManufactureName>זנלכל בע"מ</ManufactureName>
+      <ManufactureCountry>ישראל</ManufactureCountry>
+      <ManufactureItemDescription>תירס מהשדה יכין 400</ManufactureItemDescription>
+      <UnitQty>גרם</UnitQty>
+      <Quantity>400.00</Quantity>
+      <UnitOfMeasure>100 גרם</UnitOfMeasure>
+      <bIsWeighted>0</bIsWeighted>
+      <QtyInPackage>לא ידוע</QtyInPackage>
+      <ItemPrice>9.10</ItemPrice>
+      <UnitOfMeasurePrice>2.27</UnitOfMeasurePrice>
+      <AllowDiscount>1</AllowDiscount>
+      <ItemStatus/>
+    </Item>
+    
+  </Items>
+</Root>
