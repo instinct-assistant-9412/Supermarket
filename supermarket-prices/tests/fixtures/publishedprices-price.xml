@@ -1,0 +1,65 @@
+﻿<Root>
+  <ChainID>7290058140886</ChainID>
+  <SubChainID>001</SubChainID>
+  <StoreID>001</StoreID>
+  <BikoretNo>4</BikoretNo>
+  <Items>
+<Item>
+      <PriceUpdateTime>2020-08-23T11:36:36.000</PriceUpdateTime>
+      <ItemCode>7290017520933</ItemCode>
+      <LastSaleDateTime>2026-09-30T19:47:57.000</LastSaleDateTime>
+      <ItemType>1</ItemType>
+      <ItemName>ערק שליט בטעם לימוני</ItemName>
+      <ManufactureName>לא ידוע</ManufactureName>
+      <ManufactureCountry>לא ידוע</ManufactureCountry>
+      <ManufactureItemDescription>ערק שליט בטעם לימוני</ManufactureItemDescription>
+      <UnitQty>לא ידוע</UnitQty>
+      <Quantity>700.00</Quantity>
+      <UnitOfMeasure>100 מיליליטר</UnitOfMeasure>
+      <bIsWeighted>0</bIsWeighted>
+      <QtyInPackage>לא ידוע</QtyInPackage>
+      <ItemPrice>54.90</ItemPrice>
+      <UnitOfMeasurePrice>0.08</UnitOfMeasurePrice>
+      <AllowDiscount>1</AllowDiscount>
+      <ItemStatus/>
+    </Item>
+<Item>
+      <PriceUpdateTime>2023-05-16T14:10:43.000</PriceUpdateTime>
+      <ItemCode>7290015037525</ItemCode>
+      <LastSaleDateTime>2026-09-26T23:02:44.000</LastSaleDateTime>
+      <ItemType>1</ItemType>
+      <ItemName>בצל ירוק שקית בדץ חס</ItemName>
+      <ManufactureName>לא ידוע</ManufactureName>
+      <ManufactureCountry>ישראל</ManufactureCountry>
+      <ManufactureItemDescription>בצל ירוק שקית בדץ חס</ManufactureItemDescription>
+      <UnitQty>יחידות</UnitQty>
+      <Quantity>1.00</Quantity>
+      <UnitOfMeasure>יחידות  </UnitOfMeasure>
+      <bIsWeighted>0</bIsWeighted>
+      <QtyInPackage>לא ידוע</QtyInPackage>
+      <ItemPrice>7.90</ItemPrice>
+      <UnitOfMeasurePrice>7.90</UnitOfMeasurePrice>
+      <AllowDiscount>1</AllowDiscount>
+      <ItemStatus/>
+    </Item>
+<Item>
+      <PriceUpdateTime>2024-12-02T14:21:09.000</PriceUpdateTime>
+      <ItemCode>4022025001752</ItemCode>
+      <LastSaleDateTime>2026-10-01T11:37:36.000</LastSaleDateTime>
+      <ItemType>1</ItemType>
+      <ItemName>בלו נאן כשר מבעבע חצ</ItemName>
+      <ManufactureName>לא ידוע</ManufactureName>
+      <ManufactureCountry>גרמניה</ManufactureCountry>
+      <ManufactureItemDescription>בלו נאן כשר מבעבע חצ</ManufactureItemDescription>
+      <UnitQty>לא ידוע</UnitQty>
+      <Quantity>750.00</Quantity>
+      <UnitOfMeasure>100 מיליליטר</UnitOfMeasure>
+      <bIsWeighted>0</bIsWeighted>
+      <QtyInPackage>לא ידוע</QtyInPackage>
+      <ItemPrice>49.90</ItemPrice>
+      <UnitOfMeasurePrice>0.07</UnitOfMeasurePrice>
+      <AllowDiscount>1</AllowDiscount>
+      <ItemStatus/>
+    </Item>
+</Items>
+</Root>

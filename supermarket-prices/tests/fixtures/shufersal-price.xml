@@ -1,0 +1,65 @@
+﻿<Root>
+  <ChainID>7290027600007</ChainID>
+  <SubChainID>001</SubChainID>
+  <StoreID>001</StoreID>
+  <BikoretNo>9</BikoretNo>
+  <Items>
+<Item>
+      <PriceUpdateTime>2026-10-04T13:51:00</PriceUpdateTime>
+      <ItemCode>7290016314779</ItemCode>
+      <LastSaleDateTime>2026-09-30T11:34:02</LastSaleDateTime>
+      <ItemType>1</ItemType>
+      <ItemName>פילה מטיאס הולנדי 200גרם</ItemName>
+      <ManufactureName>סלטי שמיר 2006 בעמ</ManufactureName>
+      <ManufactureCountry>IL</ManufactureCountry>
+      <ManufactureItemDescription>פילה מטיאס הולנדי 200גרם</ManufactureItemDescription>
+      <UnitQty>גרם</UnitQty>
+      <Quantity>220.00</Quantity>
+      <UnitOfMeasure>100 גרם</UnitOfMeasure>
+      <bIsWeighted>0</bIsWeighted>
+      <QtyInPackage>1</QtyInPackage>
+      <ItemPrice>22.90</ItemPrice>
+      <UnitOfMeasurePrice>10.41</UnitOfMeasurePrice>
+      <AllowDiscount>1</AllowDiscount>
+      <ItemStatus>1</ItemStatus>
+    </Item>
+<Item>
+      <PriceUpdateTime>2026-10-04T13:51:00</PriceUpdateTime>
+      <ItemCode>7290016314786</ItemCode>
+      <LastSaleDateTime>2026-10-02T13:37:55</LastSaleDateTime>
+      <ItemType>1</ItemType>
+      <ItemName>הרינג כבוש עם בצל 220 גר</ItemName>
+      <ManufactureName>סלטי שמיר פל דג</ManufactureName>
+      <ManufactureCountry>IL</ManufactureCountry>
+      <ManufactureItemDescription>הרינג כבוש עם בצל 220 גר</ManufactureItemDescription>
+      <UnitQty>גרם</UnitQty>
+      <Quantity>220.00</Quantity>
+      <UnitOfMeasure>100 גרם</UnitOfMeasure>
+      <bIsWeighted>0</bIsWeighted>
+      <QtyInPackage>1</QtyInPackage>
+      <ItemPrice>22.90</ItemPrice>
+      <UnitOfMeasurePrice>10.41</UnitOfMeasurePrice>
+      <AllowDiscount>1</AllowDiscount>
+      <ItemStatus>1</ItemStatus>
+    </Item>
+<Item>
+      <PriceUpdateTime>2026-10-04T13:51:00</PriceUpdateTime>
+      <ItemCode>7290016314816</ItemCode>
+      <LastSaleDateTime>2026-09-24T12:39:05</LastSaleDateTime>
+      <ItemType>1</ItemType>
+      <ItemName>סלט הרינג עם מיונז 200 ג</ItemName>
+      <ManufactureName>סלטי שמיר פל דג</ManufactureName>
+      <ManufactureCountry>IL</ManufactureCountry>
+      <ManufactureItemDescription>סלט הרינג עם מיונז 200 ג</ManufactureItemDescription>
+      <UnitQty>גרם</UnitQty>
+      <Quantity>200.00</Quantity>
+      <UnitOfMeasure>100 גרם</UnitOfMeasure>
+      <bIsWeighted>0</bIsWeighted>
+      <QtyInPackage>1</QtyInPackage>
+      <ItemPrice>22.90</ItemPrice>
+      <UnitOfMeasurePrice>11.45</UnitOfMeasurePrice>
+      <AllowDiscount>1</AllowDiscount>
+      <ItemStatus>1</ItemStatus>
+    </Item>
+</Items>
+</Root>

@@ -1,0 +1,33 @@
+{
+  "name": "supermarket-prices",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Israeli supermarket prices from the price-transparency files: independent downloader, normalization, Postgres, API and MCP server",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && cp src/db/schema.sql dist/src/db/",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "migrate": "tsx src/cli.ts migrate",
+    "ingest": "tsx src/cli.ts ingest",
+    "quality": "tsx src/cli.ts quality",
+    "api": "tsx src/api/server.ts",
+    "mcp": "tsx src/mcp/server.ts"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.0",
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "fast-xml-parser": "^4.5.0",
+    "hono": "^4.6.0",
+    "pg": "^8.13.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/pg": "^8.11.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}
