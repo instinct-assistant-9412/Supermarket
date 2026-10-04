@@ -1,0 +1,28 @@
+[project]
+name = "supermarket-prices"
+version = "0.1.0"
+description = "Normalized, queryable Israeli supermarket prices (starter)"
+requires-python = ">=3.10,<3.13"
+dependencies = [
+  "sqlalchemy>=2.0,<2.1",
+  "psycopg2-binary>=2.9",
+  "lxml>=5.2",
+  "fastapi>=0.110",
+  "uvicorn>=0.29",
+  "pydantic>=2.5",
+  "pydantic-settings>=2.2",
+  "mcp>=1.2,<2",
+]
+
+[project.optional-dependencies]
+scrape = ["il-supermarket-scraper>=1.0.14"]
+dev = ["pytest>=8", "httpx>=0.27"]
+
+[project.scripts]
+smp = "smp.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["smp*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

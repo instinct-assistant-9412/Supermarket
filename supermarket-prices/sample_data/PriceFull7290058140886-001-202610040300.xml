@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Root><ChainId>7290058140886</ChainId><SubChainId>1</SubChainId><StoreId>1</StoreId><BikoretNo>1</BikoretNo>
+<Items Count="4"><Item><PriceUpdateDate>2026-10-04 03:00</PriceUpdateDate><ItemCode>7290000000015</ItemCode><ItemType>1</ItemType>
+<ItemName>תנובה חלב 3% בקבוק 1 ל'</ItemName><ManufacturerName>תנובה בע"מ</ManufacturerName><UnitQty>ליטר</UnitQty><Quantity>1</Quantity>
+<bIsWeighted>0</bIsWeighted><UnitOfMeasure>ליטר</UnitOfMeasure><ItemPrice>6.5</ItemPrice>
+<UnitOfMeasurePrice>6.5</UnitOfMeasurePrice><ItemStatus>1</ItemStatus></Item>
+<Item><PriceUpdateDate>2026-10-04 03:00</PriceUpdateDate><ItemCode>0000000099999</ItemCode><ItemType>1</ItemType>
+<ItemName>חלב תנובה 3% 1 ליטר אריזה</ItemName><ManufacturerName>תנובה</ManufacturerName><UnitQty>ליטר</UnitQty><Quantity>1</Quantity>
+<bIsWeighted>0</bIsWeighted><UnitOfMeasure>ליטר</UnitOfMeasure><ItemPrice>5.5</ItemPrice>
+<UnitOfMeasurePrice>5.5</UnitOfMeasurePrice><ItemStatus>1</ItemStatus></Item>
+<Item><PriceUpdateDate>2026-10-04 03:00</PriceUpdateDate><ItemCode>77001</ItemCode><ItemType>1</ItemType>
+<ItemName>קוטג תנובה 250 גר</ItemName><ManufacturerName>תנובה</ManufacturerName><UnitQty>גרם</UnitQty><Quantity>250</Quantity>
+<bIsWeighted>0</bIsWeighted><UnitOfMeasure>גרם</UnitOfMeasure><ItemPrice>5.7</ItemPrice>
+<UnitOfMeasurePrice>5.7</UnitOfMeasurePrice><ItemStatus>1</ItemStatus></Item>
+<Item><PriceUpdateDate>2026-10-04 03:00</PriceUpdateDate><ItemCode>7290000000039</ItemCode><ItemType>1</ItemType>
+<ItemName>קולה 1.5 ליטר</ItemName><ManufacturerName></ManufacturerName><UnitQty>ליטר</UnitQty><Quantity>1.5</Quantity>
+<bIsWeighted>0</bIsWeighted><UnitOfMeasure>ליטר</UnitOfMeasure><ItemPrice>6.0</ItemPrice>
+<UnitOfMeasurePrice>6.0</UnitOfMeasurePrice><ItemStatus>1</ItemStatus></Item></Items></Root>

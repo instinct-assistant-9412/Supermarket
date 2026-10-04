@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Root><ChainId>7290027600007</ChainId><SubChainId>1</SubChainId><StoreId>1</StoreId><BikoretNo>1</BikoretNo>
+<Items Count="4"><Item><PriceUpdateDate>2026-10-05 03:00</PriceUpdateDate><ItemCode>7290000000015</ItemCode><ItemType>1</ItemType>
+<ItemName>חלב תנובה 3% 1 ליטר</ItemName><ManufacturerName>תנובה</ManufacturerName><UnitQty>ליטר</UnitQty><Quantity>1</Quantity>
+<bIsWeighted>0</bIsWeighted><UnitOfMeasure>ליטר</UnitOfMeasure><ItemPrice>6.9</ItemPrice>
+<UnitOfMeasurePrice>6.9</UnitOfMeasurePrice><ItemStatus>1</ItemStatus></Item>
+<Item><PriceUpdateDate>2026-10-05 03:00</PriceUpdateDate><ItemCode>7290000000022</ItemCode><ItemType>1</ItemType>
+<ItemName>קוטג' תנובה 250 גרם</ItemName><ManufacturerName>תנובה</ManufacturerName><UnitQty>גרם</UnitQty><Quantity>250</Quantity>
+<bIsWeighted>0</bIsWeighted><UnitOfMeasure>גרם</UnitOfMeasure><ItemPrice>5.9</ItemPrice>
+<UnitOfMeasurePrice>5.9</UnitOfMeasurePrice><ItemStatus>1</ItemStatus></Item>
+<Item><PriceUpdateDate>2026-10-05 03:00</PriceUpdateDate><ItemCode>1234</ItemCode><ItemType>1</ItemType>
+<ItemName>לחם אחיד פרוס</ItemName><ManufacturerName></ManufacturerName><UnitQty>יחידה</UnitQty><Quantity>1</Quantity>
+<bIsWeighted>0</bIsWeighted><UnitOfMeasure>יחידה</UnitOfMeasure><ItemPrice>7.5</ItemPrice>
+<UnitOfMeasurePrice>7.5</UnitOfMeasurePrice><ItemStatus>1</ItemStatus></Item>
+<Item><PriceUpdateDate>2026-10-05 03:00</PriceUpdateDate><ItemCode>5001</ItemCode><ItemType>1</ItemType>
+<ItemName>עגבניות</ItemName><ManufacturerName></ManufacturerName><UnitQty>ק"ג</UnitQty><Quantity>1</Quantity>
+<bIsWeighted>1</bIsWeighted><UnitOfMeasure>ק"ג</UnitOfMeasure><ItemPrice>8.9</ItemPrice>
+<UnitOfMeasurePrice>8.9</UnitOfMeasurePrice><ItemStatus>1</ItemStatus></Item></Items></Root>
