@@ -19,7 +19,8 @@
 | `src/ingest` | קליטה: התאמה, כתיבת מחירים, היסטוריה רק כששינוי מחיר, בדיקות איכות. `MemoryRepository` לבדיקות |
 | `src/quality` | בדיקות איכות לכל קובץ ובדיקת טריות לכל רשת |
 | `src/api` | API ב-**Hono** |
-| `src/mcp` | שרת MCP עם ה-SDK הרשמי (`@modelcontextprotocol/sdk`) |
+| `src/mcp` | שרת MCP עם ה-SDK הרשמי (`@modelcontextprotocol/sdk`): stdio ו-Streamable HTTP |
+| `src/scheduler` | קליטה יומית אוטומטית: כל הרשתות, retry/backoff, בדיקת טריות |
 
 **למה Hono ולא Fastify:** קטן, מבוסס Request/Response סטנדרטי (אפשר לבדוק עם `app.request()` בלי להרים שרת), וטיפוסים טובים. אין כאן צורך ב-ecosystem של plugins.
 
@@ -54,6 +55,9 @@ npm run ingest                  # כל הרשתות ברשימה (קבצי Price
 npm run quality                 # טריות לכל רשת
 npm run api                     # http://localhost:3000
 npm run mcp                     # שרת MCP ב-stdio
+npm run mcp:http                # שרת MCP מרחוק ב-HTTP: http://localhost:3001/mcp
+npm run scheduler               # שירות הקליטה היומית (בדרך כלל דרך docker compose)
+npm run ingest:all              # ריצה ידנית של כל מה שה-scheduler מריץ
 npm test                        # בדיקות
 npm run typecheck               # tsc
 ```
@@ -72,9 +76,55 @@ curl localhost:3000/quality/review
 
 `area.text` מותאם מול עיר/כתובת/שם הסניף. שימו לב: בחלק מהרשתות שדה העיר הוא **קוד ישוב של הלמ"ס** (למשל `3000`), לא שם (ראו "דורש בדיקה חיה").
 
-### MCP
+## קליטה יומית אוטומטית
 
-כלים: `search_products`, `price_history`, `cheapest_basket`, `data_freshness`. דוגמת הגדרה ל-Claude Desktop / סוכן אחר:
+בלי קליטה שוטפת הנתונים מתיישנים, אז יש שירות `scheduler` נפרד ב-`docker-compose.yml`.
+
+```bash
+docker compose up -d        # db + scheduler (+ mcp)
+docker compose logs -f scheduler
+```
+
+**איך זה עובד**
+
+1. השירות עולה, יוצר את הסכמה אם חסרה (`migrate`, בטוח להרצה חוזרת) וקובע ריצה יומית עם `node-cron`.
+2. בכל ריצה, בזו אחר זו, **כל הרשתות המוגדרות** ב-`src/downloader/registry.ts`: קבצי Stores + PriceFull האחרונים לכל סניף. חנויות האונליין (`StoreType=2`) נכללות בלי הגדרה נוספת.
+3. קבצים שכבר נקלטו מדולגים, אז ריצה חוזרת באותו יום זולה ובטוחה.
+4. בסוף: בדיקת טריות (`fresh` / `stale` / `never`) לכל רשת, מודפסת ללוג.
+
+**כשל ברשת אחת לא עוצר את האחרות.** לכל רשת יש ניסיון חוזר עם backoff מעריכי (ברירת מחדל 3 ניסיונות: המתנה של 60 שניות, ואז 240).
+רשת שנכשלה אחרי כל הניסיונות (למשל ויקטורי, שעדיין לא נגישה) מסומנת `failed` והריצה ממשיכה. אם רק חלק מהקבצים נכשלו: `partial`, בלי ניסיון חוזר.
+בסוף כל ריצה יש שורת סיכום, למשל `[daily-ingest] done: 3/12 chains ok, 9 failed`, ושורה לכל רשת עם מספר קבצים שנקלטו / דולגו / נכשלו.
+
+**לשנות את השעה** - משתני סביבה (ב-`.env` ליד `docker-compose.yml`, או ב-shell):
+
+| משתנה | ברירת מחדל | משמעות |
+|---|---|---|
+| `INGEST_HOUR` / `INGEST_MINUTE` | `6` / `0` | שעת הריצה היומית |
+| `INGEST_TZ` | `Asia/Jerusalem` | אזור זמן |
+| `INGEST_CRON` | (ריק) | ביטוי cron מלא, גובר על שעה/דקה. למשל `0 */6 * * *` = כל 6 שעות |
+| `INGEST_RUN_ON_START` | `false` | `true` = ריצה אחת מיד כשהשירות עולה |
+| `INGEST_RETRY_ATTEMPTS` / `INGEST_RETRY_BASE_SECONDS` | `3` / `60` | ניסיונות חוזרים והמתנה בסיסית |
+
+אחרי שינוי: `docker compose up -d scheduler`. ברירת המחדל 06:00 נבחרה כדי שהרשתות כבר יפרסמו את קבצי הלילה.
+
+**ריצה ידנית** (אותה לוגיקה בדיוק): `npm run ingest:all`, או בתוך docker: `docker compose run --rm scheduler node dist/src/scheduler/runOnce.js`.
+לרשת אחת: `npm run ingest -- --chain shufersal`.
+
+## MCP לכלי AI
+
+כלים (שמות באנגלית, תיאורים מנוסחים לסוכן):
+
+| כלי | מה הוא עושה |
+|---|---|
+| `search_products` | חיפוש מוצר לפי שם בעברית / ברקוד. מחזיר `product_id`, GTIN, טווח מחירים |
+| `price_history` | היסטוריית מחיר של מוצר, אפשר לצמצם לרשת / סניף / מספר ימים |
+| `cheapest_basket` | הסל הזול ביותר לאזור. אונליין ופיזי לא מעורבבים (`online`) |
+| `list_chains` | הרשתות שבמערכת, עם מספר סניפים/מחירים וטריות |
+| `list_stores` | סניפים לפי אזור / רשת / אונליין |
+| `data_freshness` | טריות הנתונים לכל רשת |
+
+### חיבור ב-stdio (Claude Desktop ועוד)
 
 ```json
 { "mcpServers": { "supermarket-prices": {
@@ -83,11 +133,39 @@ curl localhost:3000/quality/review
   "env": { "DATABASE_URL": "postgres://prices:prices@localhost:5432/prices" } } } }
 ```
 
+### חיבור מרחוק ב-HTTP (Streamable HTTP)
+
+```bash
+MCP_AUTH_TOKEN=$(openssl rand -hex 24) npm run mcp:http     # או: docker compose up -d mcp
+# endpoint: http://localhost:3001/mcp
+```
+
+- השרת stateless: כל בקשה היא `POST` ל-`/mcp`, בלי session. `GET` מחזיר 405.
+- **אבטחה:** כשמוגדר `MCP_AUTH_TOKEN`, כל בקשה חייבת `Authorization: Bearer <token>`. בלי טוקן השרת פתוח לכל מי שמגיע אליו, לכן ברירת המחדל מאזינה רק ל-`127.0.0.1`.
+  כדי לחשוף לאינטרנט: שימו אותו מאחורי reverse proxy עם HTTPS, ותמיד עם טוקן.
+- לקוח שתומך ב-HTTP ישירות (Claude Code, Cursor ועוד):
+  `claude mcp add --transport http supermarket-prices http://localhost:3001/mcp --header "Authorization: Bearer <token>"`
+- Claude Desktop (דרך גשר `mcp-remote`):
+
+```json
+{ "mcpServers": { "supermarket-prices": {
+  "command": "npx",
+  "args": ["-y", "mcp-remote", "http://localhost:3001/mcp", "--header", "Authorization: Bearer <token>"] } } }
+```
+
+- לקוח כללי, בדיקה עם curl:
+
+```bash
+curl -s http://localhost:3001/mcp -H 'content-type: application/json' -H 'accept: application/json, text/event-stream' \
+  -H 'Authorization: Bearer <token>' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"search_products","arguments":{"query":"חלב תנובה 3%"}}}'
+```
+
 ## מה נבדק
 
-- `npm run typecheck` (tsc, strict) עובר. `npm test`: 43 בדיקות עוברות, 1 מדולגת כברירת מחדל (אינטגרציה מול Postgres אמיתי).
+- `npm run typecheck` (tsc, strict) עובר. `npm test`: 66 בדיקות עוברות, 1 מדולגת כברירת מחדל (אינטגרציה מול Postgres אמיתי).
 - יחידה: GTIN, נרמול עברית, טריגרמות, פענוח XML מקבצים אמיתיים (שופרסל ורמי לוי, כולל UTF-16 לקובץ סניפים), שמות קבצים, חילוץ קישורים מ-HTML של שופרסל, בדיקות איכות.
-- E2E עם מקור מדומה: שתי רשתות, ברקוד משותף = מוצר אחד, חיבור fuzzy לפי שם, דילוג על קובץ שכבר נקלט, היסטוריה רק בשינוי מחיר, דחיית קובץ עם ChainId שגוי, ה-API וכלי ה-MCP (ב-transport בזיכרון).
+- E2E עם מקור מדומה: שתי רשתות, ברקוד משותף = מוצר אחד, חיבור fuzzy לפי שם, דילוג על קובץ שכבר נקלט, היסטוריה רק בשינוי מחיר, דחיית קובץ עם ChainId שגוי, ה-API וכלי ה-MCP (ב-transport בזיכרון ו-Streamable HTTP, כולל טוקן), לוגיקת ה-scheduler (בידוד כשל לכל רשת, backoff, partial).
 - אינטגרציה מול Postgres אמיתי (`TEST_DATABASE_URL=... npm test`, כולל pg_trgm על עברית): עברה מול Postgres 18 מקומי.
 - בדיקה חיה חד-פעמית בזמן הכתיבה: התחברות לפורטל publishedprices עם המשתמש `RamiLevi`, רשימת קבצים, הורדה ופענוח של קובץ PriceFull (13,139 מוצרים) וקובץ סניפים (99 סניפים);
   קליטה מלאה של קובץ אחד ל-Postgres (כ-13 אלף מחירים, כ-40 שניות); רשימת הקבצים של שופרסל (עמוד ראשון). זו הבדיקה מהגרסה הראשונית, לא ריצה מחדש באיטרציה הזאת.

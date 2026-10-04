@@ -60,6 +60,10 @@ export class PriceService {
     return { resolved, stores, complete: stores.length > 0 && stores[0]!.missingProductIds.length === 0 };
   }
 
+  listStores(opts: { text?: string; chainIds?: string[]; online?: boolean; limit?: number }) {
+    return this.repo.listStores({ ...opts, limit: Math.min(Math.max(opts.limit ?? 50, 1), 200) });
+  }
+
   freshness() {
     return this.repo.freshness();
   }

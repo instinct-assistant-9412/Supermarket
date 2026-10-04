@@ -3,7 +3,7 @@ import type { StoreRecord } from "../types.js";
 import { normalizeHebrew } from "../normalize/hebrew.js";
 import type {
   BasketLine, BasketStoreResult, ChainItemRow, FreshnessRow, HistoryPoint, IngestRunInfo, PriceWrite,
-  ProductRow, Repository, SearchHit, SimilarProduct, StoreArea, WriteResult,
+  ProductRow, Repository, SearchHit, SimilarProduct, StoreArea, StoreListRow, WriteResult,
 } from "../ingest/repository.js";
 
 type Row = Record<string, any>;
@@ -229,6 +229,22 @@ export class PgRepository implements Repository {
     return r.rows.map((x) => ({
       chainId: x.chain_id, chainName: x.chain_name, storeKey: String(x.id), storeName: x.name, address: x.address,
       city: x.city, isOnline: x.is_online === true, total: Math.round(Number(x.total) * 100) / 100, found: Number(x.found), missingProductIds: x.missing,
+    }));
+  }
+
+  async listStores(opts: { text?: string; chainIds?: string[]; online?: boolean; limit: number }): Promise<StoreListRow[]> {
+    const r = await this.pool.query(
+      `SELECT s.id, s.chain_id, c.name AS chain_name, s.name, s.address, s.city, s.is_online
+       FROM stores s LEFT JOIN chains c ON c.chain_id = s.chain_id
+       WHERE ($1::text IS NULL OR s.search_text LIKE '%' || $1 || '%')
+         AND ($2::text[] IS NULL OR s.chain_id = ANY($2))
+         AND ($3::boolean IS NULL OR s.is_online = $3)
+       ORDER BY s.chain_id, s.name
+       LIMIT $4`,
+      [opts.text ? normalizeHebrew(opts.text) : null, opts.chainIds?.length ? opts.chainIds : null, opts.online ?? null, opts.limit],
+    );
+    return r.rows.map((x) => ({
+      chainId: x.chain_id, chainName: x.chain_name, storeKey: String(x.id), storeName: x.name, address: x.address, city: x.city, isOnline: x.is_online === true,
     }));
   }
 

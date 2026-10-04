@@ -146,7 +146,7 @@ describe("mocked end-to-end ingest", () => {
     const client = new Client({ name: "test", version: "0" });
     await client.connect(ct);
     const tools = await client.listTools();
-    expect(tools.tools.map((t) => t.name).sort()).toEqual(["cheapest_basket", "data_freshness", "price_history", "search_products"]);
+    expect(tools.tools.map((t) => t.name).sort()).toEqual(["cheapest_basket", "data_freshness", "list_chains", "list_stores", "price_history", "search_products"]);
     const res = (await client.callTool({ name: "search_products", arguments: { query: "אורז בסמטי" } })) as { content: Array<{ text: string }> };
     expect(JSON.parse(res.content[0]!.text)[0].minPrice).toBe(12.9);
   });

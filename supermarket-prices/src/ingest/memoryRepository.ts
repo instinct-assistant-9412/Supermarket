@@ -3,7 +3,7 @@ import { normalizeHebrew } from "../normalize/hebrew.js";
 import { similarity } from "../normalize/trigram.js";
 import type {
   BasketLine, BasketStoreResult, ChainItemRow, FreshnessRow, HistoryPoint, IngestRunInfo, PriceWrite,
-  ProductRow, Repository, SearchHit, SimilarProduct, StoreArea, WriteResult,
+  ProductRow, Repository, SearchHit, SimilarProduct, StoreArea, StoreListRow, WriteResult,
 } from "./repository.js";
 
 interface StoreMem extends StoreRecord {
@@ -162,6 +162,16 @@ export class MemoryRepository implements Repository {
       });
     }
     return out.sort((a, b) => b.found - a.found || a.total - b.total).slice(0, limit);
+  }
+  async listStores(opts: { text?: string; chainIds?: string[]; online?: boolean; limit: number }): Promise<StoreListRow[]> {
+    const out: StoreListRow[] = [];
+    for (const s of this.stores.values()) {
+      if (opts.online !== undefined && s.isOnline !== opts.online) continue;
+      if (opts.chainIds?.length && !opts.chainIds.includes(s.chainId)) continue;
+      if (opts.text && !normalizeHebrew([s.city, s.address, s.name].filter(Boolean).join(" ")).includes(normalizeHebrew(opts.text))) continue;
+      out.push({ chainId: s.chainId, chainName: this.chains.get(s.chainId) ?? null, storeKey: s.key, storeName: s.name, address: s.address, city: s.city, isOnline: s.isOnline });
+    }
+    return out.sort((a, b) => a.chainId.localeCompare(b.chainId) || (a.storeName ?? "").localeCompare(b.storeName ?? "")).slice(0, opts.limit);
   }
   async freshness(): Promise<FreshnessRow[]> {
     return [...this.chains.entries()].map(([chainId, chainName]) => {

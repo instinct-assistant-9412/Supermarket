@@ -103,6 +103,16 @@ export interface FreshnessRow {
   lastIngestAt: Date | null;
 }
 
+export interface StoreListRow {
+  chainId: string;
+  chainName: string | null;
+  storeKey: string;
+  storeName: string | null;
+  address: string | null;
+  city: string | null;
+  isOnline: boolean;
+}
+
 export interface Repository {
   upsertChain(chainId: string, name: string | null): Promise<void>;
   upsertStores(stores: StoreRecord[]): Promise<void>;
@@ -125,5 +135,7 @@ export interface Repository {
   priceHistory(productId: number, opts: { chainId?: string; storeKey?: string; since?: Date }): Promise<HistoryPoint[]>;
   basket(lines: BasketLine[], area: StoreArea, limit: number, requireAll: boolean): Promise<BasketStoreResult[]>;
   freshness(): Promise<FreshnessRow[]>;
+  /** online undefined = both physical and online stores */
+  listStores(opts: { text?: string; chainIds?: string[]; online?: boolean; limit: number }): Promise<StoreListRow[]>;
   reviewQueue(limit: number): Promise<Array<ChainItemRow & { productName: string }>>;
 }
