@@ -1,7 +1,7 @@
 import cron from "node-cron";
 import { loadConfig } from "../config.js";
 import { openStorage } from "../db/storage.js";
-import { allSources } from "../downloader/registry.js";
+import { configuredSources } from "../downloader/registry.js";
 import { runDailyIngest } from "./dailyIngest.js";
 import { loadScheduleConfig } from "./schedule.js";
 
@@ -28,7 +28,7 @@ async function run(reason: string) {
     await runDailyIngest({
       repo,
       config,
-      sources: allSources({ userAgent: config.userAgent }),
+      sources: configuredSources({ userAgent: config.userAgent }, config.onlineOnly),
       retry: { attempts: sched.attempts, baseDelayMs: sched.baseDelayMs, factor: 4 },
       log,
     });

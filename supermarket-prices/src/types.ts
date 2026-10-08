@@ -55,6 +55,6 @@ export interface RemoteFile {
 export interface ChainSource {
   key: string;
   name: string;
-  listFiles(kinds: FileKind[]): Promise<RemoteFile[]>;
+  listFiles(kinds: FileKind[], storeIds?: string[]): Promise<RemoteFile[]>;
   download(file: RemoteFile): Promise<Buffer>;
 }

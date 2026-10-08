@@ -28,7 +28,7 @@ function search(q: string, limit: number): SearchHit[] {
     .sort((a, b) => b.score - a.score || a.p.name.localeCompare(b.p.name, "he"))
     .slice(0, limit)
     .map(({ p, score }) => {
-      const prices = currentPrices(p.id).filter((x) => !MOCK_STORES.find((s) => s.storeKey === x.storeKey)?.isOnline);
+      const prices = currentPrices(p.id).filter((x) => MOCK_STORES.find((s) => s.storeKey === x.storeKey)?.isOnline);
       const vals = prices.map((x) => x.price);
       return {
         ...p,

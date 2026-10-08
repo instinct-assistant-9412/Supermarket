@@ -21,6 +21,14 @@ export const PUBLISHED_PRICES_CHAINS: PublishedPricesChain[] = [
   { key: "doralon", name: "דור אלון", username: "doralon" },
 ];
 
+export const ONLINE_CHAIN_KEYS = ["rami-levy", "carrefour", "shufersal", "victory"] as const;
+export const ONLINE_CHAIN_IDS = ["7290058140886", "7290055700007", "7290027600007", "7290696200003", "7290058103393"] as const;
+
+export function configuredSources(http: HttpOptions, onlineOnly = true): ChainSource[] {
+  const sources = allSources(http);
+  return onlineOnly ? ONLINE_CHAIN_KEYS.map((key) => sources.find((s) => s.key === key)!) : sources;
+}
+
 export function allSources(http: HttpOptions): ChainSource[] {
   return [new ShufersalSource(http), new CarrefourSource(http), new VictorySource(http), ...PUBLISHED_PRICES_CHAINS.map((c) => new PublishedPricesSource(c, http))];
 }

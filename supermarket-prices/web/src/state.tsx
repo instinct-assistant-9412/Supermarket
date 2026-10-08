@@ -26,9 +26,9 @@ const KEY = "supermarket-web-v1";
 function load(): { items: BasketItem[]; online: boolean } {
   try {
     const raw = JSON.parse(localStorage.getItem(KEY) ?? "null") as { items?: BasketItem[]; online?: boolean } | null;
-    return { items: Array.isArray(raw?.items) ? raw!.items : [], online: raw?.online === true };
+    return { items: Array.isArray(raw?.items) ? raw!.items : [], online: true };
   } catch {
-    return { items: [], online: false };
+    return { items: [], online: true };
   }
 }
 
@@ -53,7 +53,7 @@ export function AppProvider({ children, api }: { children: ReactNode; api?: ApiC
   const setQty = useCallback((id: number, qty: number) => setState((s) => ({ ...s, items: s.items.map((i) => (i.id === id ? { ...i, qty: Math.max(1, Math.min(99, qty)) } : i)) })), []);
   const remove = useCallback((id: number) => setState((s) => ({ ...s, items: s.items.filter((i) => i.id !== id) })), []);
   const clear = useCallback(() => setState((s) => ({ ...s, items: [] })), []);
-  const setOnline = useCallback((online: boolean) => setState((s) => ({ ...s, online })), []);
+  const setOnline = useCallback((_online: boolean) => setState((s) => ({ ...s, online: true })), []);
 
   const value = useMemo(() => ({ api: client, items: state.items, add, setQty, remove, clear, online: state.online, setOnline }), [client, state, add, setQty, remove, clear, setOnline]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

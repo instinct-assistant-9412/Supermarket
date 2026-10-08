@@ -5,6 +5,8 @@ export interface Config {
   /** נתיב קובץ ה-SQLite (או :memory:) */
   sqlitePath: string;
   apiPort: number;
+  /** Default application scope: only the four requested chains and their online stores. */
+  onlineOnly: boolean;
   /** minimum trigram similarity for an automatic cross-chain name match */
   fuzzyAutoThreshold: number;
   /** below auto but above this -> new product + flagged for review */
@@ -32,6 +34,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     databaseUrl: env.DATABASE_URL ?? "postgres://prices:prices@localhost:5432/prices",
     sqlitePath: env.SQLITE_PATH ?? "data/prices.db",
     apiPort: num(env.PORT, 3000),
+    onlineOnly: env.ONLINE_ONLY !== "false",
     fuzzyAutoThreshold: num(env.FUZZY_AUTO_THRESHOLD, 0.8),
     fuzzyReviewThreshold: num(env.FUZZY_REVIEW_THRESHOLD, 0.55),
     maxPriceIls: num(env.MAX_PRICE_ILS, 10000),

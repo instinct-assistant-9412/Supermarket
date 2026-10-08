@@ -1,4 +1,4 @@
-FROM node:20-slim AS build
+FROM node:26-slim AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
@@ -7,7 +7,7 @@ COPY src ./src
 COPY tests ./tests
 RUN npm run build
 
-FROM node:20-slim
+FROM node:26-slim
 ENV NODE_ENV=production TZ=Asia/Jerusalem
 WORKDIR /app
 COPY package.json package-lock.json ./

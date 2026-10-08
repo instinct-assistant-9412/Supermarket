@@ -74,7 +74,7 @@ export function ProductPage({ refId }: { refId: string }) {
         <div className="card">
           <h2>מחיר נוכחי לפי רשת</h2>
           {byChain.length === 0 ? (
-            <Empty title="אין מחירים לסוג החנות שנבחר">נסו לעבור בין סניפים פיזיים לאונליין.</Empty>
+            <Empty title="אין מחירים לסוג החנות שנבחר">בדקו את טריות הנתונים ואת תוצאות קליטת חנויות האונליין.</Empty>
           ) : (
             <ul className="chain-list">
               {byChain.map(([chainId, rows], idx) => {

@@ -17,7 +17,7 @@ const opts = { config, now: () => new Date("2026-10-04T08:00:00Z") };
 
 const open: Storage[] = [];
 async function mem() {
-  const s = await openStorage({ dbDriver: "sqlite", databaseUrl: "", sqlitePath: ":memory:" });
+  const s = await openStorage({ dbDriver: "sqlite", databaseUrl: "", sqlitePath: ":memory:", onlineOnly: false });
   open.push(s);
   return s;
 }
@@ -128,7 +128,7 @@ describe("SQLite (מצב מקומי, בלי Postgres)", () => {
   it("הנתונים נשמרים בקובץ בין הרצות (כולל אינדקס החיפוש)", async () => {
     const dir = mkdtempSync(join(tmpdir(), "prices-"));
     try {
-      const cfg = { dbDriver: "sqlite" as const, databaseUrl: "", sqlitePath: join(dir, "sub", "prices.db") };
+      const cfg = { dbDriver: "sqlite" as const, databaseUrl: "", sqlitePath: join(dir, "sub", "prices.db"), onlineOnly: false };
       const s1 = await openStorage(cfg);
       await ingestSource(s1.repo, sources().a, opts);
       await s1.close();
