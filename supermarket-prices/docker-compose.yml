@@ -25,6 +25,9 @@ services:
       DB_DRIVER: pg
       DATABASE_URL: postgres://prices:prices@db:5432/prices
       PORT: "3000"
+      API_INGEST_ON_START: ${API_INGEST_ON_START:-false}
+      # The separate scheduler owns ALL ingestion in this compose deployment.
+      API_INGEST_SCHEDULED: "false"
     ports:
       - "127.0.0.1:3000:3000"
   web:
@@ -48,7 +51,7 @@ services:
       INGEST_HOUR: ${INGEST_HOUR:-6}
       INGEST_MINUTE: ${INGEST_MINUTE:-0}
       INGEST_TZ: ${INGEST_TZ:-Asia/Jerusalem}
-      INGEST_RUN_ON_START: ${INGEST_RUN_ON_START:-false}
+      INGEST_RUN_ON_START: ${INGEST_RUN_ON_START:-true}
       INGEST_RETRY_ATTEMPTS: ${INGEST_RETRY_ATTEMPTS:-3}
       INGEST_RETRY_BASE_SECONDS: ${INGEST_RETRY_BASE_SECONDS:-60}
   mcp:
