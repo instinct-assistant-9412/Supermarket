@@ -13,6 +13,28 @@ services:
       test: ["CMD-SHELL", "pg_isready -U prices"]
       interval: 5s
       retries: 10
+  api:
+    # REST API: http://localhost:3000
+    build: .
+    command: ["node", "dist/src/api/server.js"]
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_DRIVER: pg
+      DATABASE_URL: postgres://prices:prices@db:5432/prices
+      PORT: "3000"
+    ports:
+      - "127.0.0.1:3000:3000"
+  web:
+    # ממשק web (עברית, RTL): http://localhost:8080 . מעביר /api אל שירות ה-api
+    build: ./web
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "127.0.0.1:8080:80"
   scheduler:
     # daily ingest of all chains (see README: "קליטה יומית אוטומטית")
     build: .
@@ -21,6 +43,7 @@ services:
       db:
         condition: service_healthy
     environment:
+      DB_DRIVER: pg
       DATABASE_URL: postgres://prices:prices@db:5432/prices
       INGEST_HOUR: ${INGEST_HOUR:-6}
       INGEST_MINUTE: ${INGEST_MINUTE:-0}
@@ -37,6 +60,7 @@ services:
       db:
         condition: service_healthy
     environment:
+      DB_DRIVER: pg
       DATABASE_URL: postgres://prices:prices@db:5432/prices
       MCP_HOST: 0.0.0.0
       MCP_PORT: "3001"
