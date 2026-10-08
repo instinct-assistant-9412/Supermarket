@@ -123,9 +123,10 @@ export async function ingestSource(
   source: ChainSource,
   opts: IngestOptions & { kinds?: FileKind[]; maxFiles?: number; expectedChainId?: string | null; onlineOnly?: boolean },
 ): Promise<SourceIngestSummary> {
+  const onlineOnly = opts.onlineOnly ?? false;
   const kinds = opts.kinds ?? ["pricefull"];
   const summary: SourceIngestSummary = { source: source.key, filesSeen: 0, filesIngested: 0, filesSkipped: 0, failures: [], runs: [] };
-  const listed = await source.listFiles([...kinds, "stores"]);
+  const listed = await source.listFiles(["stores"]);
   summary.filesSeen = listed.length;
 
   const onlineStoreIds = new Set<string>();
@@ -135,7 +136,7 @@ export async function ingestSource(
     try {
       const stores = parseStoresFile(await source.download(sf));
       await repo.upsertChain(stores[0]?.chainId ?? sf.chainId ?? source.key, source.name);
-      await repo.upsertStores(stores);
+      await repo.upsertStores(onlineOnly ? stores.filter((s) => s.isOnline) : stores);
       for (const s of stores) canonical.set(`${s.chainId}:${stripZeros(s.subChainId)}:${stripZeros(s.storeId)}`, s);
       for (const s of stores) if (s.isOnline) onlineStoreIds.add(`${s.chainId}:${stripZeros(s.storeId)}`);
     } catch (e) {
@@ -143,11 +144,16 @@ export async function ingestSource(
     }
   }
 
-  let priceFiles = latestPerStore(listed.filter((f) => kinds.includes(f.kind)));
-  if (opts.onlineOnly) {
+  const ids = [...onlineStoreIds].map((key) => key.split(":")[1]!);
+  const prices = onlineOnly && ids.length === 0 ? [] : await source.listFiles(kinds, onlineOnly ? ids : undefined);
+  summary.filesSeen += prices.length;
+  let priceFiles = latestPerStore(prices.filter((f) => kinds.includes(f.kind)));
+  if (onlineOnly) {
     // only stores the Stores file marks as StoreType=2; without a readable Stores file nothing is ingested
     priceFiles = priceFiles.filter((f) => f.chainId && f.storeId && onlineStoreIds.has(`${f.chainId}:${stripZeros(f.storeId)}`));
   }
+  if (onlineOnly && onlineStoreIds.size === 0) summary.failures.push({ file: "online-store-selection", error: "No online stores identified from readable Stores files; physical stores will not be used" });
+  else if (onlineOnly && priceFiles.length === 0) summary.failures.push({ file: "online-price-selection", error: "No online price files available; physical stores will not be used" });
   if (opts.maxFiles) priceFiles = priceFiles.slice(0, opts.maxFiles);
   for (const f of priceFiles) {
     if (await repo.hasIngestedFile(f.name)) {
@@ -157,7 +163,11 @@ export async function ingestSource(
     try {
       const { file: reconciled, note } = reconcileStoreId(parsePriceFile(await source.download(f)), f);
       // "1"/"39" in the XML vs "001"/"039" in the Stores file are the same store: use one spelling
-      const known = canonical.get(`${reconciled.chainId}:${stripZeros(reconciled.subChainId)}:${stripZeros(reconciled.storeId)}`);
+      const exact = canonical.get(`${reconciled.chainId}:${stripZeros(reconciled.subChainId)}:${stripZeros(reconciled.storeId)}`);
+      // Shufersal may use different sub-chain IDs in Stores and Prices. Only use an unambiguous store match.
+      const candidates = [...canonical.values()].filter((s) => s.chainId === reconciled.chainId && stripZeros(s.storeId) === stripZeros(reconciled.storeId));
+      const known = exact ?? (candidates.length === 1 ? candidates[0] : undefined);
+      if (onlineOnly && !known?.isOnline) throw new Error("Online store identity could not be verified");
       const parsed = known ? { ...reconciled, subChainId: known.subChainId, storeId: known.storeId } : reconciled;
       const run = await ingestPriceFile(repo, parsed, { fileName: f.name, fileTime: f.publishedAt, expectedChainId: opts.expectedChainId ?? f.chainId, chainName: source.name }, opts);
       if (note) run.issues.push(note);

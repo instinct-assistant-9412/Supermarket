@@ -1,6 +1,6 @@
 import { loadConfig } from "../config.js";
 import { openStorage } from "../db/storage.js";
-import { allSources } from "../downloader/registry.js";
+import { configuredSources } from "../downloader/registry.js";
 import { runDailyIngest } from "./dailyIngest.js";
 import { loadScheduleConfig } from "./schedule.js";
 
@@ -13,7 +13,7 @@ try {
   const report = await runDailyIngest({
     repo: storage.repo,
     config,
-    sources: allSources({ userAgent: config.userAgent }),
+    sources: configuredSources({ userAgent: config.userAgent }, config.onlineOnly),
     retry: { attempts: sched.attempts, baseDelayMs: sched.baseDelayMs, factor: 4 },
     log: (l) => console.log(l),
   });

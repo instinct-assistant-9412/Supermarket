@@ -26,6 +26,12 @@ describe("Shufersal", () => {
       "https://prices.shufersal.co.il/FileObject/UpdateCategory?catID=2&page=2",
     ]);
   });
+  it("filters online listings by canonical store ID", async () => {
+    const fetch = vi.fn().mockResolvedValue(new Response(page(link.replaceAll("-001-001-", "-001-413-"))));
+    vi.stubGlobal("fetch", fetch);
+    expect(await new ShufersalSource(http).listFiles(["pricefull"], ["413", "413"])).toHaveLength(1);
+    expect(fetch.mock.calls[0]?.[0]).toBe("https://prices.shufersal.co.il/FileObject/UpdateCategory?catID=2&storeId=413");
+  });
   it("throws instead of silently truncating at a page cap", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(page('<tfoot><a href="?page=22">last</a></tfoot>'))));
     await expect(new ShufersalSource(http, 5).listFiles(["pricefull"])).rejects.toThrow("above cap");

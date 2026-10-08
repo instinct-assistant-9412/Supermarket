@@ -32,17 +32,8 @@ export function Empty({ title, children }: { title: string; children?: ReactNode
   );
 }
 
-export function ModeToggle({ online, onChange }: { online: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <div className="segmented" role="radiogroup" aria-label="סוג חנות">
-      <button type="button" role="radio" aria-checked={!online} className={!online ? "on" : ""} onClick={() => onChange(false)}>
-        סניפים פיזיים
-      </button>
-      <button type="button" role="radio" aria-checked={online} className={online ? "on" : ""} onClick={() => onChange(true)}>
-        חנויות אונליין
-      </button>
-    </div>
-  );
+export function ModeToggle(_props: { online: boolean; onChange: (v: boolean) => void }) {
+  return <p className="muted small">חנויות אונליין בלבד: רמי לוי, קרפור, שופרסל, ויקטורי</p>;
 }
 
 export function Qty({ value, onChange, label }: { value: number; onChange: (n: number) => void; label: string }) {

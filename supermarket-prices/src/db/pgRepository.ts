@@ -1,3 +1,4 @@
+import { ONLINE_CHAIN_IDS } from "../downloader/registry.js";
 import type pg from "pg";
 import type { StoreRecord } from "../types.js";
 import { normalizeHebrew } from "../normalize/hebrew.js";
@@ -13,7 +14,12 @@ const searchText = (s: { name: string | null; address: string | null; city: stri
   normalizeHebrew([s.city, s.address, s.name].filter(Boolean).join(" "));
 
 export class PgRepository implements Repository {
-  constructor(private pool: pg.Pool) {}
+  constructor(private pool: pg.Pool, private onlineOnly = false) {}
+
+
+  private scope(alias = "s"): string {
+    return this.onlineOnly ? `${alias}.is_online = true AND ${alias}.chain_id IN (${ONLINE_CHAIN_IDS.map((id) => `'${id}'`).join(",")})` : "1=1";
+  }
 
   async upsertChain(chainId: string, name: string | null) {
     await this.pool.query(
@@ -170,8 +176,9 @@ export class PgRepository implements Repository {
        LEFT JOIN LATERAL (
          SELECT min(cp.price) AS min_price, max(cp.price) AS max_price, count(DISTINCT cp.chain_id) AS chains
          FROM chain_items ci JOIN current_prices cp ON cp.chain_id = ci.chain_id AND cp.item_code = ci.item_code
-         WHERE ci.product_id = p.id) agg ON true
-       WHERE p.name_norm % $1 OR p.name_norm LIKE '%' || $1 || '%'
+         JOIN stores s ON s.id = cp.store_pk
+         WHERE ci.product_id = p.id AND ${this.scope()}) agg ON true
+       WHERE (p.name_norm % $1 OR p.name_norm LIKE '%' || $1 || '%') AND (NOT ${this.onlineOnly} OR agg.chains > 0)
        ORDER BY score DESC, chains DESC LIMIT $2`,
       [q, limit],
     );
@@ -187,7 +194,8 @@ export class PgRepository implements Repository {
     const r = await this.pool.query(
       `SELECT h.chain_id, h.store_pk, h.price, h.valid_from
        FROM price_history h JOIN chain_items ci ON ci.chain_id = h.chain_id AND ci.item_code = h.item_code
-       WHERE ci.product_id = $1
+       JOIN stores s ON s.id = h.store_pk
+         WHERE ci.product_id = $1 AND ${this.scope()}
          AND ($2::text IS NULL OR h.chain_id = $2)
          AND ($3::int IS NULL OR h.store_pk = $3)
          AND ($4::timestamptz IS NULL OR h.valid_from >= $4)
@@ -215,7 +223,7 @@ export class PgRepository implements Repository {
                 (SELECT 1 FROM best b2 WHERE b2.store_pk = s.id AND b2.product_id = w2.product_id)) AS missing
        FROM best b JOIN want w ON w.product_id = b.product_id
        JOIN stores s ON s.id = b.store_pk LEFT JOIN chains c ON c.chain_id = s.chain_id
-       WHERE ($3::text IS NULL OR s.search_text LIKE '%' || $3 || '%')
+       WHERE ${this.scope()} AND ($3::text IS NULL OR s.search_text LIKE '%' || $3 || '%')
          AND ($4::text[] IS NULL OR s.chain_id = ANY($4))
          AND ($5::int[] IS NULL OR s.id = ANY($5))
          AND s.is_online = $9  -- online and physical stores are never compared in the same answer
@@ -224,7 +232,7 @@ export class PgRepository implements Repository {
        ORDER BY count(*) DESC, sum(b.price * w.qty) ASC
        LIMIT $8`,
       [ids, qtys, area.text ? normalizeHebrew(area.text) : null, area.chainIds?.length ? area.chainIds : null,
-       area.storeKeys?.length ? area.storeKeys.map(Number) : null, requireAll, lines.length, limit, area.online ?? false],
+       area.storeKeys?.length ? area.storeKeys.map(Number) : null, requireAll, lines.length, limit, this.onlineOnly || (area.online ?? false)],
     );
     return r.rows.map((x) => ({
       chainId: x.chain_id, chainName: x.chain_name, storeKey: String(x.id), storeName: x.name, address: x.address,
@@ -236,7 +244,7 @@ export class PgRepository implements Repository {
     const r = await this.pool.query(
       `SELECT s.id, s.chain_id, c.name AS chain_name, s.name, s.address, s.city, s.is_online
        FROM stores s LEFT JOIN chains c ON c.chain_id = s.chain_id
-       WHERE ($1::text IS NULL OR s.search_text LIKE '%' || $1 || '%')
+       WHERE ${this.scope()} AND ($1::text IS NULL OR s.search_text LIKE '%' || $1 || '%')
          AND ($2::text[] IS NULL OR s.chain_id = ANY($2))
          AND ($3::boolean IS NULL OR s.is_online = $3)
        ORDER BY s.chain_id, s.name
@@ -251,11 +259,11 @@ export class PgRepository implements Repository {
   async freshness(): Promise<FreshnessRow[]> {
     const r = await this.pool.query(
       `SELECT c.chain_id, c.name,
-              (SELECT count(DISTINCT store_pk) FROM current_prices cp WHERE cp.chain_id = c.chain_id) AS stores,
-              (SELECT count(*) FROM current_prices cp WHERE cp.chain_id = c.chain_id) AS current_prices,
-              (SELECT max(file_time) FROM ingest_runs ir WHERE ir.chain_id = c.chain_id AND ir.status <> 'failed') AS last_file_time,
-              (SELECT max(created_at) FROM ingest_runs ir WHERE ir.chain_id = c.chain_id) AS last_ingest_at
-       FROM chains c ORDER BY c.chain_id`,
+              (SELECT count(DISTINCT store_pk) FROM current_prices cp JOIN stores s ON s.id = cp.store_pk WHERE cp.chain_id = c.chain_id AND ${this.scope()}) AS stores,
+              (SELECT count(*) FROM current_prices cp JOIN stores s ON s.id = cp.store_pk WHERE cp.chain_id = c.chain_id AND ${this.scope()}) AS current_prices,
+              (SELECT max(file_time) FROM ingest_runs ir WHERE ir.chain_id = c.chain_id AND ir.status <> 'failed' AND EXISTS (SELECT 1 FROM stores s WHERE s.chain_id = ir.chain_id AND s.sub_chain_id || '-' || s.store_id = ir.store_id AND ${this.scope()})) AS last_file_time,
+              (SELECT max(created_at) FROM ingest_runs ir WHERE ir.chain_id = c.chain_id AND EXISTS (SELECT 1 FROM stores s WHERE s.chain_id = ir.chain_id AND s.sub_chain_id || '-' || s.store_id = ir.store_id AND ${this.scope()})) AS last_ingest_at
+       FROM chains c WHERE ${this.onlineOnly ? `c.chain_id IN (${ONLINE_CHAIN_IDS.map((id) => `'${id}'`).join(',')})` : '1=1'} ORDER BY c.chain_id`,
     );
     return r.rows.map((x) => ({
       chainId: x.chain_id, chainName: x.name, stores: Number(x.stores), currentPrices: Number(x.current_prices),
@@ -266,7 +274,7 @@ export class PgRepository implements Repository {
   async reviewQueue(limit: number) {
     const r = await this.pool.query(
       `SELECT ci.*, p.name AS product_name FROM chain_items ci JOIN products p ON p.id = ci.product_id
-       WHERE ci.needs_review ORDER BY ci.updated_at DESC LIMIT $1`, [limit]);
+       WHERE ci.needs_review AND EXISTS (SELECT 1 FROM current_prices cp JOIN stores s ON s.id = cp.store_pk WHERE cp.chain_id = ci.chain_id AND cp.item_code = ci.item_code AND ${this.scope()}) ORDER BY ci.updated_at DESC LIMIT $1`, [limit]);
     return r.rows.map((x) => ({
       chainId: x.chain_id, itemCode: x.item_code, productId: x.product_id, rawName: x.raw_name, matchMethod: x.match_method,
       matchScore: x.match_score, needsReview: x.needs_review, productName: x.product_name,

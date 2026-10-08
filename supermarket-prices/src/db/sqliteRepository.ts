@@ -1,3 +1,4 @@
+import { ONLINE_CHAIN_IDS } from "../downloader/registry.js";
 import type Database from "better-sqlite3";
 import type { StoreRecord } from "../types.js";
 import { normalizeHebrew } from "../normalize/hebrew.js";
@@ -24,12 +25,17 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 export class SqliteRepository implements Repository {
   private index = new TrigramIndex();
 
-  constructor(private db: Database.Database, schemaSql: string) {
+  constructor(private db: Database.Database, schemaSql: string, private onlineOnly = false) {
     db.pragma("journal_mode = WAL");
     db.pragma("busy_timeout = 5000");
     db.pragma("foreign_keys = ON");
     db.exec(schemaSql);
     for (const r of db.prepare("SELECT id, name_norm FROM products").iterate() as Iterable<Row>) this.index.add(r.id, r.name_norm);
+  }
+
+
+  private scope(alias = "s"): string {
+    return this.onlineOnly ? `${alias}.is_online = 1 AND ${alias}.chain_id IN (${ONLINE_CHAIN_IDS.map((id) => `'${id}'`).join(",")})` : "1=1";
   }
 
   async upsertChain(chainId: string, name: string | null) {
@@ -164,12 +170,12 @@ export class SqliteRepository implements Repository {
     const agg = this.db.prepare(
       `SELECT min(cp.price) AS min_price, max(cp.price) AS max_price, count(DISTINCT cp.chain_id) AS chains
        FROM chain_items ci JOIN current_prices cp ON cp.chain_id = ci.chain_id AND cp.item_code = ci.item_code
-       WHERE ci.product_id = ?`,
+       JOIN stores s ON s.id = cp.store_pk
+       WHERE ci.product_id = ? AND ${this.scope()}`,
     );
     const getP = this.db.prepare(`SELECT * FROM products WHERE id=?`);
     const hits: SearchHit[] = [...scores.entries()]
       .sort((a, b) => b[1] - a[1])
-      .slice(0, Math.max(limit * 3, 60))
       .map(([id, score]) => {
         const a = agg.get(id) as Row;
         return {
@@ -179,7 +185,7 @@ export class SqliteRepository implements Repository {
           chains: Number(a.chains),
         };
       });
-    return hits.sort((a, b) => b.score - a.score || b.chains - a.chains || a.id - b.id).slice(0, limit);
+    return hits.filter((h) => !this.onlineOnly || h.chains > 0).sort((a, b) => b.score - a.score || b.chains - a.chains || a.id - b.id).slice(0, limit);
   }
 
   async priceHistory(productId: number, opts: { chainId?: string; storeKey?: string; since?: Date }): Promise<HistoryPoint[]> {
@@ -187,7 +193,8 @@ export class SqliteRepository implements Repository {
       .prepare(
         `SELECT h.chain_id, h.store_pk, h.price, h.valid_from
          FROM price_history h JOIN chain_items ci ON ci.chain_id = h.chain_id AND ci.item_code = h.item_code
-         WHERE ci.product_id = ?
+         JOIN stores s ON s.id = h.store_pk
+         WHERE ci.product_id = ? AND ${this.scope()}
            AND (? IS NULL OR h.chain_id = ?)
            AND (? IS NULL OR h.store_pk = ?)
            AND (? IS NULL OR h.valid_from >= ?)
@@ -200,8 +207,8 @@ export class SqliteRepository implements Repository {
   async basket(lines: BasketLine[], area: StoreArea, limit: number, requireAll: boolean): Promise<BasketStoreResult[]> {
     if (lines.length === 0) return [];
     const ids = lines.map((l) => l.productId);
-    const where: string[] = [`ci.product_id IN (${ids.map(() => "?").join(",")})`, "s.is_online = ?"];
-    const args: Array<string | number> = [...ids, area.online ? 1 : 0];
+    const where: string[] = [`ci.product_id IN (${ids.map(() => "?").join(",")})`, "s.is_online = ?", this.scope()];
+    const args: Array<string | number> = [...ids, this.onlineOnly || area.online ? 1 : 0];
     if (area.text) {
       where.push("instr(s.search_text, ?) > 0");
       args.push(normalizeHebrew(area.text));
@@ -246,7 +253,7 @@ export class SqliteRepository implements Repository {
   }
 
   async listStores(opts: { text?: string; chainIds?: string[]; online?: boolean; limit: number }): Promise<StoreListRow[]> {
-    const where: string[] = ["1=1"];
+    const where: string[] = [this.scope()];
     const args: Array<string | number> = [];
     if (opts.text) {
       where.push("instr(s.search_text, ?) > 0");
@@ -272,11 +279,11 @@ export class SqliteRepository implements Repository {
     const rows = this.db
       .prepare(
         `SELECT c.chain_id, c.name,
-                (SELECT count(DISTINCT store_pk) FROM current_prices cp WHERE cp.chain_id = c.chain_id) AS stores,
-                (SELECT count(*) FROM current_prices cp WHERE cp.chain_id = c.chain_id) AS current_prices,
-                (SELECT max(file_time) FROM ingest_runs ir WHERE ir.chain_id = c.chain_id AND ir.status <> 'failed') AS last_file_time,
-                (SELECT max(created_at) FROM ingest_runs ir WHERE ir.chain_id = c.chain_id) AS last_ingest_at
-         FROM chains c ORDER BY c.chain_id`,
+                (SELECT count(DISTINCT store_pk) FROM current_prices cp JOIN stores s ON s.id = cp.store_pk WHERE cp.chain_id = c.chain_id AND ${this.scope()}) AS stores,
+                (SELECT count(*) FROM current_prices cp JOIN stores s ON s.id = cp.store_pk WHERE cp.chain_id = c.chain_id AND ${this.scope()}) AS current_prices,
+                (SELECT max(file_time) FROM ingest_runs ir WHERE ir.chain_id = c.chain_id AND ir.status <> 'failed' AND EXISTS (SELECT 1 FROM stores s WHERE s.chain_id = ir.chain_id AND s.sub_chain_id || '-' || s.store_id = ir.store_id AND ${this.scope()})) AS last_file_time,
+                (SELECT max(created_at) FROM ingest_runs ir WHERE ir.chain_id = c.chain_id AND EXISTS (SELECT 1 FROM stores s WHERE s.chain_id = ir.chain_id AND s.sub_chain_id || '-' || s.store_id = ir.store_id AND ${this.scope()})) AS last_ingest_at
+         FROM chains c WHERE ${this.onlineOnly ? `c.chain_id IN (${ONLINE_CHAIN_IDS.map((id) => `'${id}'`).join(',')})` : '1=1'} ORDER BY c.chain_id`,
       )
       .all() as Row[];
     return rows.map((x) => ({
@@ -288,7 +295,7 @@ export class SqliteRepository implements Repository {
   async reviewQueue(limit: number) {
     const rows = this.db
       .prepare(`SELECT ci.*, p.name AS product_name FROM chain_items ci JOIN products p ON p.id = ci.product_id
-                WHERE ci.needs_review = 1 ORDER BY ci.updated_at DESC LIMIT ?`)
+                WHERE ci.needs_review = 1 AND EXISTS (SELECT 1 FROM current_prices cp JOIN stores s ON s.id = cp.store_pk WHERE cp.chain_id = ci.chain_id AND cp.item_code = ci.item_code AND ${this.scope()}) ORDER BY ci.updated_at DESC LIMIT ?`)
       .all(limit) as Row[];
     return rows.map((x) => ({
       chainId: x.chain_id, itemCode: x.item_code, productId: x.product_id, rawName: x.raw_name, matchMethod: x.match_method,

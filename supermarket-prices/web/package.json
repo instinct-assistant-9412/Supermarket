@@ -2,7 +2,7 @@
   "name": "supermarket-prices-web",
   "version": "0.1.0",
   "private": true,
-  "description": "ממשק web (עברית, RTL) למחירי סופרמרקטים",
+  "description": "\u05de\u05de\u05e9\u05e7 web (\u05e2\u05d1\u05e8\u05d9\u05ea, RTL) \u05dc\u05de\u05d7\u05d9\u05e8\u05d9 \u05e1\u05d5\u05e4\u05e8\u05de\u05e8\u05e7\u05d8\u05d9\u05dd",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,7 +10,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "node scripts/test.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

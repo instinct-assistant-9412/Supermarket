@@ -16,25 +16,28 @@ export class ShufersalSource implements ChainSource {
   name = "שופרסל";
   constructor(private http: HttpOptions, private maxPages = 1000) {}
 
-  async listFiles(kinds: FileKind[]): Promise<RemoteFile[]> {
+  async listFiles(kinds: FileKind[], storeIds?: string[]): Promise<RemoteFile[]> {
     const out = new Map<string, RemoteFile>();
     for (const kind of [...new Set(kinds)]) {
       const cat = CATEGORY[kind];
       if (cat === undefined) continue;
-      let totalPages = 1;
-      for (let page = 1; page <= totalPages; page++) {
-        const query = new URLSearchParams({ catID: String(cat) });
-        if (page > 1) query.set("page", String(page));
-        const res = await fetchWithRetry(`${BASE}/FileObject/UpdateCategory?${query}`, { opts: this.http });
-        if (!res.ok) throw new Error(`Shufersal listing HTTP ${res.status} (category ${cat}, page ${page})`);
-        const html = await res.text();
-        if (!html.includes('id="gridContainer"')) throw new Error("Shufersal directory format changed");
-        totalPages = Math.max(totalPages, extractShufersalPageCount(html));
-        if (totalPages > this.maxPages) throw new Error(`Shufersal needs ${totalPages} pages, above cap ${this.maxPages}`);
-        const files = extractShufersalLinks(html, this.key);
-        if (files.some((f) => f.kind !== kind)) throw new Error(`Shufersal category ${cat} returned wrong file kind`);
-        if (files.length === 0 && totalPages > 1) throw new Error(`Shufersal empty page ${page} of ${totalPages}`);
-        for (const f of files) out.set(f.name, f);
+      for (const storeId of (kind === "stores" || !storeIds ? [undefined] : [...new Set(storeIds)])) {
+        let totalPages = 1;
+        for (let page = 1; page <= totalPages; page++) {
+          const query = new URLSearchParams({ catID: String(cat) });
+          if (storeId) query.set("storeId", storeId);
+          if (page > 1) query.set("page", String(page));
+          const res = await fetchWithRetry(`${BASE}/FileObject/UpdateCategory?${query}`, { opts: this.http });
+          if (!res.ok) throw new Error(`Shufersal listing HTTP ${res.status} (category ${cat}, page ${page})`);
+          const html = await res.text();
+          if (!html.includes('id="gridContainer"')) throw new Error("Shufersal directory format changed");
+          totalPages = Math.max(totalPages, extractShufersalPageCount(html));
+          if (totalPages > this.maxPages) throw new Error(`Shufersal needs ${totalPages} pages, above cap ${this.maxPages}`);
+          const files = extractShufersalLinks(html, this.key);
+          if (files.some((f) => f.kind !== kind)) throw new Error(`Shufersal category ${cat} returned wrong file kind`);
+          if (files.length === 0 && totalPages > 1) throw new Error(`Shufersal empty page ${page} of ${totalPages}`);
+          for (const f of files) out.set(f.name, f);
+        }
       }
     }
     return [...out.values()];
