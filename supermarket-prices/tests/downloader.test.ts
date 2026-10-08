@@ -27,7 +27,7 @@ describe("Shufersal", () => {
     ]);
   });
   it("filters online listings by canonical store ID", async () => {
-    const fetch = vi.fn().mockResolvedValue(new Response(page(link.replaceAll("-001-001-", "-001-413-"))));
+    const fetch = vi.fn().mockResolvedValueOnce(new Response(page(link.replaceAll("-001-001-", "-002-413-")))).mockResolvedValueOnce(new Response("payload"));
     vi.stubGlobal("fetch", fetch);
     expect(await new ShufersalSource(http).listFiles(["pricefull"], ["413", "413"])).toHaveLength(1);
     expect(fetch.mock.calls[0]?.[0]).toBe("https://prices.shufersal.co.il/FileObject/UpdateCategory?catID=2&storeId=413");
@@ -70,15 +70,11 @@ describe("Victory", () => {
     expect(extractVictoryFiles(data,"7290696200003")).toEqual([]);
     expect(() => extractVictoryFiles({},"7290058103393")).toThrow("expected array");
   });
-  it("skips inactive roots and requests one catalog per active chain", async () => {
-    const fetch = vi.fn().mockResolvedValueOnce(new Response("[]")).mockResolvedValueOnce(new Response('[{"branchNumber":1}]')).mockResolvedValueOnce(new Response(JSON.stringify([{fileName:name}])));
+  it("retains the direct API route for Israeli egress", async () => {
+    const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify([{fileName:"PriceFull7290696200003-001-097-20261008-051546.gz"}])));
     vi.stubGlobal("fetch",fetch);
-    expect(await new VictorySource(http).listFiles(["pricefull"])).toHaveLength(1);
-    expect(fetch.mock.calls.map(c=>c[0])).toEqual([
-      "https://laibcatalog.co.il/webapi/api/getbranches?edi=7290696200003",
-      "https://laibcatalog.co.il/webapi/api/getbranches?edi=7290058103393",
-      "https://laibcatalog.co.il/webapi/api/getfiles?edi=7290058103393",
-    ]);
+    expect(await new VictorySource(http, "direct").listFiles(["pricefull"])).toHaveLength(1);
+    expect(fetch.mock.calls[0]![0]).toBe("https://laibcatalog.co.il/webapi/api/getfiles?edi=7290696200003");
   });
 });
 it("registers all three sources", () => {

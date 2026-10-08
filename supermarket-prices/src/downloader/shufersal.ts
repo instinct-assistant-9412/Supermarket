@@ -14,9 +14,11 @@ const CATEGORY: Partial<Record<FileKind, number>> = { price: 1, pricefull: 2, pr
 export class ShufersalSource implements ChainSource {
   key = "shufersal";
   name = "שופרסל";
+  private downloaded = new Map<string, Buffer>();
   constructor(private http: HttpOptions, private maxPages = 1000) {}
 
   async listFiles(kinds: FileKind[], storeIds?: string[]): Promise<RemoteFile[]> {
+    this.downloaded.clear();
     const out = new Map<string, RemoteFile>();
     for (const kind of [...new Set(kinds)]) {
       const cat = CATEGORY[kind];
@@ -27,7 +29,7 @@ export class ShufersalSource implements ChainSource {
           const query = new URLSearchParams({ catID: String(cat) });
           if (storeId) query.set("storeId", storeId);
           if (page > 1) query.set("page", String(page));
-          const res = await fetchWithRetry(`${BASE}/FileObject/UpdateCategory?${query}`, { opts: this.http });
+          const res = await fetchWithRetry(`${BASE}/FileObject/UpdateCategory?${query}`, { opts: { ...this.http, timeoutMs: 90_000, retries: this.http.retries ?? 2 } });
           if (!res.ok) throw new Error(`Shufersal listing HTTP ${res.status} (category ${cat}, page ${page})`);
           const html = await res.text();
           if (!html.includes('id="gridContainer"')) throw new Error("Shufersal directory format changed");
@@ -36,7 +38,14 @@ export class ShufersalSource implements ChainSource {
           const files = extractShufersalLinks(html, this.key);
           if (files.some((f) => f.kind !== kind)) throw new Error(`Shufersal category ${cat} returned wrong file kind`);
           if (files.length === 0 && totalPages > 1) throw new Error(`Shufersal empty page ${page} of ${totalPages}`);
-          for (const f of files) out.set(f.name, f);
+          for (const f of files) {
+            if (storeIds && f.kind !== "stores") {
+              if (!f.storeId || !storeIds.some(id => Number(id) === Number(f.storeId))) throw new Error("Shufersal returned a foreign store");
+              if (f.storeId === "413" && f.subChainId !== "002") throw new Error("Shufersal 413 must be in subchain 002");
+              this.downloaded.set(f.ref, await getBuffer(f.ref, this.http));
+            }
+            out.set(f.name, f);
+          }
         }
       }
     }
@@ -44,7 +53,8 @@ export class ShufersalSource implements ChainSource {
   }
 
   download(file: RemoteFile): Promise<Buffer> {
-    return getBuffer(file.ref, this.http);
+    const cached = this.downloaded.get(file.ref);
+    return cached ? Promise.resolve(cached) : getBuffer(file.ref, this.http);
   }
 }
 
