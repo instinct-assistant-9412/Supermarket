@@ -186,3 +186,18 @@ dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; }
 }
 @media (min-width: 1000px) { .fresh-grid { grid-template-columns: repeat(4, 1fr); } }
 @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2s; } }
+
+/* Fixed image boxes keep RTL cards stable while optional photos load. */
+.product-link { flex-direction: row; align-items: center; gap: .75rem; }
+.product-copy { display: flex; flex-direction: column; min-width: 0; }
+.product-name { color: inherit; text-decoration: none; }
+.product-image { width: 84px; flex: 0 0 84px; text-align: center; }
+.product-image.large { width: 164px; flex-basis: 164px; }
+.image-frame { height: 84px; background: #fff; border: 1px solid var(--border); border-radius: 12px; display: grid; place-items: center; overflow: hidden; }
+.large .image-frame { height: 164px; }
+.image-frame img { width: 100%; height: 100%; object-fit: contain; padding: 4px; }
+.image-placeholder { display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--muted); font-size: .65rem; }
+.image-credit { display: block; font-size: .55rem; line-height: 1.4; margin-top: 4px; direction: ltr; }
+.image-credit a { color: var(--muted); }
+.product-identity { display: flex; align-items: center; gap: 1rem; min-width: 0; }
+@media (max-width: 480px) { .product-image.large { width: 104px; flex-basis: 104px; } .large .image-frame { height: 104px; } }
