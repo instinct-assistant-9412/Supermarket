@@ -15,7 +15,8 @@ export interface ParsedFileName {
  * Real files vary (separators, missing seconds, store without sub-chain); anything unknown yields nulls.
  */
 export function parseFileName(name: string): ParsedFileName {
-  const base = name.replace(/\.(gz|xml|zip)$/i, "");
+  // Laib Stores uses YYYYMMDDHHMMSS-HHMMSS; normalize to the common date/time form.
+  const base = name.replace(/\.(gz|xml|zip)$/i, "").replace(/^(Stores.*-)(\d{8})(\d{6})-\d{6}$/i, "$1$2-$3");
   const m = base.match(/^(PriceFull|Price|PromoFull|Promo|Stores)[_-]?(\d{6,13})(?:-(\d{1,4}))?(?:-(\d{1,4}))?-(\d{8})-?(\d{3,6})?$/i);
   if (!m) return { kind: "unknown", chainId: null, subChainId: null, storeId: null, publishedAt: null };
   const kind = m[1]!.toLowerCase() as FileKind;
