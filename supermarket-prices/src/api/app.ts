@@ -1,3 +1,4 @@
+import type { IngestStatus } from "./autoIngest.js";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { z } from "zod";
@@ -19,12 +20,13 @@ const basketSchema = z.object({
 });
 
 /** Hono was picked over Fastify: tiny, Web-standard Request/Response (easy to test with app.request), first-class TS types. */
-export function createApp(service: PriceService, config: Pick<Config, "maxFileAgeHours">, opts: { corsOrigin?: string } = {}) {
+export function createApp(service: PriceService, config: Pick<Config, "maxFileAgeHours">, opts: { corsOrigin?: string; ingestStatus?: () => IngestStatus } = {}) {
   const app = new Hono();
   // רק כשה-web app רץ על origin אחר (CORS_ORIGIN=http://localhost:5173 או *). בברירת מחדל ה-proxy של Vite/nginx מספיק.
   if (opts.corsOrigin) app.use("*", cors({ origin: opts.corsOrigin === "*" ? "*" : opts.corsOrigin.split(",").map((o) => o.trim()) }));
 
   app.get("/health", (c) => c.json({ ok: true }));
+  app.get("/ingest/status", (c) => c.json(opts.ingestStatus?.() ?? { phase: "disabled" }));
 
   app.get("/products/search", async (c) => {
     const q = c.req.query("q")?.trim();
