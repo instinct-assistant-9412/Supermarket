@@ -1,0 +1,47 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: prices
+      POSTGRES_PASSWORD: prices
+      POSTGRES_DB: prices
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U prices"]
+      interval: 5s
+      retries: 10
+  scheduler:
+    # daily ingest of all chains (see README: "קליטה יומית אוטומטית")
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://prices:prices@db:5432/prices
+      INGEST_HOUR: ${INGEST_HOUR:-6}
+      INGEST_MINUTE: ${INGEST_MINUTE:-0}
+      INGEST_TZ: ${INGEST_TZ:-Asia/Jerusalem}
+      INGEST_RUN_ON_START: ${INGEST_RUN_ON_START:-false}
+      INGEST_RETRY_ATTEMPTS: ${INGEST_RETRY_ATTEMPTS:-3}
+      INGEST_RETRY_BASE_SECONDS: ${INGEST_RETRY_BASE_SECONDS:-60}
+  mcp:
+    # remote MCP over HTTP: http://localhost:3001/mcp
+    build: .
+    command: ["node", "dist/src/mcp/httpServer.js"]
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://prices:prices@db:5432/prices
+      MCP_HOST: 0.0.0.0
+      MCP_PORT: "3001"
+      MCP_AUTH_TOKEN: ${MCP_AUTH_TOKEN:-}
+    ports:
+      - "127.0.0.1:3001:3001"
+volumes:
+  pgdata:

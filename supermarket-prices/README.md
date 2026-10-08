@@ -1,0 +1,246 @@
+# supermarket-prices
+
+מחירי סופרמרקטים בישראל מתוך קבצי השקיפות של הרשתות (חוק שקיפות מחירים), כפרויקט TypeScript עצמאי לחלוטין.
+אין תלות בקוד של פרויקט אחר: ה-downloader, ה-parser, הנרמול, ה-API וה-MCP נכתבו כאן מאפס.
+
+**הערך המוסף הוא שכבת הנרמול**, לא ההורדה: חיבור מוצרים בין רשתות לפי ברקוד (GTIN), התאמת שמות בעברית עם fuzzy matching,
+היסטוריית מחירים ב-Postgres ובדיקות איכות/טריות לכל רשת. מעל זה: API ושרת MCP לסוכנים. אין אפליקציית צרכן בשלב 1.
+
+> רשימת הרשתות והלינקים הרשמיים: https://www.gov.il/he/departments/legalInfo/cpfta_prices_regulations
+
+## מה יש בפנים
+
+| תיקייה | תפקיד |
+|---|---|
+| `src/downloader` | הורדה ישירה של קבצי המחירים: שופרסל (טבלת HTML + קישורי blob חתומים), קרפור (תיקיית תאריך + JSON), ויקטורי (API של Laibcatalog, טרם אומת חי) ופורטל `url.publishedprices.co.il` המשותף להרבה רשתות |
+| `src/parser` | פענוח gzip + קידודים (UTF-8 עם BOM, UTF-16, windows-1255) ו-XML של מחירים/סניפים עם וריאציות תגיות |
+| `src/normalize` | `gtin.ts` (ולידציה ונרמול ל-13 ספרות), `hebrew.ts` (ניקוד, גרשיים, אותיות סופיות, יחידות מידה, גודל), `trigram.ts`, `matcher.ts` |
+| `src/db` | `schema.sql` (מוצרים, פריטי רשת, מחירים נוכחיים, היסטוריה, ריצות קליטה) ו-`PgRepository` |
+| `src/ingest` | קליטה: התאמה, כתיבת מחירים, היסטוריה רק כששינוי מחיר, בדיקות איכות. `MemoryRepository` לבדיקות |
+| `src/quality` | בדיקות איכות לכל קובץ ובדיקת טריות לכל רשת |
+| `src/api` | API ב-**Hono** |
+| `src/mcp` | שרת MCP עם ה-SDK הרשמי (`@modelcontextprotocol/sdk`): stdio ו-Streamable HTTP |
+| `src/scheduler` | קליטה יומית אוטומטית: כל הרשתות, retry/backoff, בדיקת טריות |
+
+**למה Hono ולא Fastify:** קטן, מבוסס Request/Response סטנדרטי (אפשר לבדוק עם `app.request()` בלי להרים שרת), וטיפוסים טובים. אין כאן צורך ב-ecosystem של plugins.
+
+## איך הנרמול עובד
+
+1. **ברקוד קודם.** `ItemType=1` וקוד שעובר בדיקת ספרת ביקורת (GTIN-8/12/13, גם GTIN-14 עם אפס מוביל) נהפך ל-13 ספרות עם אפסים משמאל, וזה המפתח בין רשתות.
+   ברקודים שמתחילים ב-2 (משקל/מחיר מוטמע) וקודים פנימיים של רשת לא נחשבים ברקוד.
+2. **אין ברקוד** (ירקות, מאפייה, קוד פנימי): דמיון טריגרמות על שם מנורמל. שם מנורמל = בלי ניקוד/גרשיים, אותיות סופיות מאוחדות,
+   יחידות מאוחדות (`גר'`/`גרם`, `ל'`/`ליטר`, `קילו`/`קג`), מספר מופרד מיחידה. יש גם שמירת גודל: `200 גרם` לא יתחבר ל-`250 גרם`.
+   - דמיון ≥ `FUZZY_AUTO_THRESHOLD` (0.8): חיבור אוטומטי.
+   - בין `FUZZY_REVIEW_THRESHOLD` (0.55) ל-0.8: נוצר מוצר חדש ומסומן ב-`needs_review` (נראה ב-`GET /quality/review`).
+   - מתחת: מוצר חדש.
+3. **היסטוריה:** `price_history` מקבלת שורה רק כשהמחיר חדש או השתנה. `current_prices` שומר את המצב האחרון לכל סניף ומוצר.
+
+## בדיקות איכות
+
+לכל קובץ: קובץ ריק, `ChainId` שלא תואם לרשת (הקובץ נדחה ולא נכתב כלום), אחוז שורות לא תקינות, אחוז ברקודים תקינים נמוך,
+קודים כפולים, ירידה חדה במספר מוצרים מול הריצה הקודמת, קובץ ישן. לכל רשת: `fresh` / `stale` / `never` (`GET /quality/freshness`, `npm run quality`).
+
+## הרצה
+
+דרישות: Node 20+, Docker (ל-Postgres).
+
+```bash
+cd supermarket-prices
+cp .env.example .env            # אופציונלי, יש ברירות מחדל
+npm install
+docker compose up -d db
+npm run migrate                 # יוצר סכמה + pg_trgm
+npm run ingest -- --chain rami-levy --max-files 1     # קליטה ראשונה קטנה
+npm run ingest                  # כל הרשתות ברשימה (קבצי PriceFull, האחרון לכל סניף)
+npm run quality                 # טריות לכל רשת
+npm run api                     # http://localhost:3000
+npm run mcp                     # שרת MCP ב-stdio
+npm run mcp:http                # שרת MCP מרחוק ב-HTTP: http://localhost:3001/mcp
+npm run scheduler               # שירות הקליטה היומית (בדרך כלל דרך docker compose)
+npm run ingest:all              # ריצה ידנית של כל מה שה-scheduler מריץ
+npm test                        # בדיקות
+npm run typecheck               # tsc
+```
+
+### API
+
+```bash
+curl 'localhost:3000/products/search?q=חלב תנובה'
+curl 'localhost:3000/products/7290016314779/history?days=90'        # לפי ברקוד / מזהה מוצר / שם
+curl -X POST localhost:3000/basket/cheapest -H 'content-type: application/json' -d '{
+  "items": [{"gtin":"7290016314779","qty":2}, {"query":"אורז בסמטי","qty":1}],
+  "area": {"text":"ראש העין"}, "requireAll": true }'
+curl localhost:3000/quality/freshness
+curl localhost:3000/quality/review
+```
+
+`area.text` מותאם מול עיר/כתובת/שם הסניף. שימו לב: בחלק מהרשתות שדה העיר הוא **קוד ישוב של הלמ"ס** (למשל `3000`), לא שם (ראו "דורש בדיקה חיה").
+
+## קליטה יומית אוטומטית
+
+בלי קליטה שוטפת הנתונים מתיישנים, אז יש שירות `scheduler` נפרד ב-`docker-compose.yml`.
+
+```bash
+docker compose up -d        # db + scheduler (+ mcp)
+docker compose logs -f scheduler
+```
+
+**איך זה עובד**
+
+1. השירות עולה, יוצר את הסכמה אם חסרה (`migrate`, בטוח להרצה חוזרת) וקובע ריצה יומית עם `node-cron`.
+2. בכל ריצה, בזו אחר זו, **כל הרשתות המוגדרות** ב-`src/downloader/registry.ts`: קבצי Stores + PriceFull האחרונים לכל סניף. חנויות האונליין (`StoreType=2`) נכללות בלי הגדרה נוספת.
+3. קבצים שכבר נקלטו מדולגים, אז ריצה חוזרת באותו יום זולה ובטוחה.
+4. בסוף: בדיקת טריות (`fresh` / `stale` / `never`) לכל רשת, מודפסת ללוג.
+
+**כשל ברשת אחת לא עוצר את האחרות.** לכל רשת יש ניסיון חוזר עם backoff מעריכי (ברירת מחדל 3 ניסיונות: המתנה של 60 שניות, ואז 240).
+רשת שנכשלה אחרי כל הניסיונות (למשל ויקטורי, שעדיין לא נגישה) מסומנת `failed` והריצה ממשיכה. אם רק חלק מהקבצים נכשלו: `partial`, בלי ניסיון חוזר.
+בסוף כל ריצה יש שורת סיכום, למשל `[daily-ingest] done: 3/12 chains ok, 9 failed`, ושורה לכל רשת עם מספר קבצים שנקלטו / דולגו / נכשלו.
+
+**לשנות את השעה** - משתני סביבה (ב-`.env` ליד `docker-compose.yml`, או ב-shell):
+
+| משתנה | ברירת מחדל | משמעות |
+|---|---|---|
+| `INGEST_HOUR` / `INGEST_MINUTE` | `6` / `0` | שעת הריצה היומית |
+| `INGEST_TZ` | `Asia/Jerusalem` | אזור זמן |
+| `INGEST_CRON` | (ריק) | ביטוי cron מלא, גובר על שעה/דקה. למשל `0 */6 * * *` = כל 6 שעות |
+| `INGEST_RUN_ON_START` | `false` | `true` = ריצה אחת מיד כשהשירות עולה |
+| `INGEST_RETRY_ATTEMPTS` / `INGEST_RETRY_BASE_SECONDS` | `3` / `60` | ניסיונות חוזרים והמתנה בסיסית |
+
+אחרי שינוי: `docker compose up -d scheduler`. ברירת המחדל 06:00 נבחרה כדי שהרשתות כבר יפרסמו את קבצי הלילה.
+
+**ריצה ידנית** (אותה לוגיקה בדיוק): `npm run ingest:all`, או בתוך docker: `docker compose run --rm scheduler node dist/src/scheduler/runOnce.js`.
+לרשת אחת: `npm run ingest -- --chain shufersal`.
+
+## MCP לכלי AI
+
+כלים (שמות באנגלית, תיאורים מנוסחים לסוכן):
+
+| כלי | מה הוא עושה |
+|---|---|
+| `search_products` | חיפוש מוצר לפי שם בעברית / ברקוד. מחזיר `product_id`, GTIN, טווח מחירים |
+| `price_history` | היסטוריית מחיר של מוצר, אפשר לצמצם לרשת / סניף / מספר ימים |
+| `cheapest_basket` | הסל הזול ביותר לאזור. אונליין ופיזי לא מעורבבים (`online`) |
+| `list_chains` | הרשתות שבמערכת, עם מספר סניפים/מחירים וטריות |
+| `list_stores` | סניפים לפי אזור / רשת / אונליין |
+| `data_freshness` | טריות הנתונים לכל רשת |
+
+### חיבור ב-stdio (Claude Desktop ועוד)
+
+```json
+{ "mcpServers": { "supermarket-prices": {
+  "command": "npx", "args": ["tsx", "src/mcp/server.ts"],
+  "cwd": "/path/to/supermarket-prices",
+  "env": { "DATABASE_URL": "postgres://prices:prices@localhost:5432/prices" } } } }
+```
+
+### חיבור מרחוק ב-HTTP (Streamable HTTP)
+
+```bash
+MCP_AUTH_TOKEN=$(openssl rand -hex 24) npm run mcp:http     # או: docker compose up -d mcp
+# endpoint: http://localhost:3001/mcp
+```
+
+- השרת stateless: כל בקשה היא `POST` ל-`/mcp`, בלי session. `GET` מחזיר 405.
+- **אבטחה:** כשמוגדר `MCP_AUTH_TOKEN`, כל בקשה חייבת `Authorization: Bearer <token>`. בלי טוקן השרת פתוח לכל מי שמגיע אליו, לכן ברירת המחדל מאזינה רק ל-`127.0.0.1`.
+  כדי לחשוף לאינטרנט: שימו אותו מאחורי reverse proxy עם HTTPS, ותמיד עם טוקן.
+- לקוח שתומך ב-HTTP ישירות (Claude Code, Cursor ועוד):
+  `claude mcp add --transport http supermarket-prices http://localhost:3001/mcp --header "Authorization: Bearer <token>"`
+- Claude Desktop (דרך גשר `mcp-remote`):
+
+```json
+{ "mcpServers": { "supermarket-prices": {
+  "command": "npx",
+  "args": ["-y", "mcp-remote", "http://localhost:3001/mcp", "--header", "Authorization: Bearer <token>"] } } }
+```
+
+- לקוח כללי, בדיקה עם curl:
+
+```bash
+curl -s http://localhost:3001/mcp -H 'content-type: application/json' -H 'accept: application/json, text/event-stream' \
+  -H 'Authorization: Bearer <token>' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"search_products","arguments":{"query":"חלב תנובה 3%"}}}'
+```
+
+## מה נבדק
+
+- `npm run typecheck` (tsc, strict) עובר. `npm test`: 66 בדיקות עוברות, 1 מדולגת כברירת מחדל (אינטגרציה מול Postgres אמיתי).
+- יחידה: GTIN, נרמול עברית, טריגרמות, פענוח XML מקבצים אמיתיים (שופרסל ורמי לוי, כולל UTF-16 לקובץ סניפים), שמות קבצים, חילוץ קישורים מ-HTML של שופרסל, בדיקות איכות.
+- E2E עם מקור מדומה: שתי רשתות, ברקוד משותף = מוצר אחד, חיבור fuzzy לפי שם, דילוג על קובץ שכבר נקלט, היסטוריה רק בשינוי מחיר, דחיית קובץ עם ChainId שגוי, ה-API וכלי ה-MCP (ב-transport בזיכרון ו-Streamable HTTP, כולל טוקן), לוגיקת ה-scheduler (בידוד כשל לכל רשת, backoff, partial).
+- אינטגרציה מול Postgres אמיתי (`TEST_DATABASE_URL=... npm test`, כולל pg_trgm על עברית): עברה מול Postgres 18 מקומי.
+- בדיקה חיה חד-פעמית בזמן הכתיבה: התחברות לפורטל publishedprices עם המשתמש `RamiLevi`, רשימת קבצים, הורדה ופענוח של קובץ PriceFull (13,139 מוצרים) וקובץ סניפים (99 סניפים);
+  קליטה מלאה של קובץ אחד ל-Postgres (כ-13 אלף מחירים, כ-40 שניות); רשימת הקבצים של שופרסל (עמוד ראשון). זו הבדיקה מהגרסה הראשונית, לא ריצה מחדש באיטרציה הזאת.
+
+## אימות הרשתות הנוספות (4 באוקטובר 2026)
+
+| רשת | מקור | רשימה, הורדה ופענוח |
+|---|---|---|
+| קרפור / יינות ביתן | https://prices.carrefour.co.il/ | 2,241 קבצים בתיקיית היום, מתוכם 177 PriceFull/Stores. PriceFull של סניף 002: 6,104 מוצרים, 0 דילוגים. Stores: 147 סניפים. אותו ChainId כולל גם סניפי יינות ביתן, לא רק מיתוג Carrefour. |
+| שופרסל | https://prices.shufersal.co.il/FileObject/UpdateCategory?catID=2 | 22 עמודי PriceFull + Stores: 425 קבצים ייחודיים. PriceFull של סניף 001: 6,620 מוצרים, 0 דילוגים. Stores: 417 סניפים. |
+| ויקטורי | https://laibcatalog.co.il/ | מתאם ניסיוני לשני מזהי רשת, נבדק ב-mocks בלבד. שרת המקור לא ענה בבדיקות HTTP/HTTPS; אין ספירת מוצרים חיה. אין fallback אוטומטי לפורטל publishedprices שלא אומת. |
+
+קובצי המקור שנדגמו:
+- קרפור: `PriceFull7290055700007-001-002-20261004-051019.gz`, `Stores7290055700007-000-20261004-000100.xml`.
+- שופרסל: `PriceFull7290027600007-001-001-20261004-030000.gz`, `Stores7290027600007-000-20261004-020.gz`.
+
+הבדיקה כאן היא עד שכבת הרשימה/הורדה/פענוח, לא קליטה מלאה ל-Postgres של הרשתות הנוספות. fixtures קטנים משמרים שורות אמיתיות מקרפור ומקובצי הסניפים של שופרסל. נוספו בדיקות ל-JSON, פגינציה, קישורים חתומים, סינון, מזהי רשת, תקלות HTTP והימנעות מקיצור שקט של הרשימה.
+
+```bash
+npm run ingest -- --chain carrefour --max-files 1
+npm run ingest -- --chain shufersal --max-files 1
+# ניסיוני בלבד, עד אימות המקור החי:
+npm run ingest -- --chain victory --max-files 1
+```
+
+מקור מחקר לנתיבי הפורטלים בלבד (ללא העתקת קוד או תלות בפרויקט):
+https://github.com/OpenIsraeliSupermarkets/israeli-supermarket-scarpers
+
+## חנויות אונליין (4 באוקטובר 2026)
+
+שלוש חנויות אונליין אומתו חיות. הן מסומנות בקובץ Stores ב-`StoreType=2`, והמערכת שומרת את זה בעמודה `stores.is_online`
+(`ALTER TABLE ... ADD COLUMN IF NOT EXISTS` ב-`schema.sql`, אז `npm run migrate` מעדכן גם מסד קיים).
+
+| רשת | חנות | קובץ | פריטים (אומת חי) |
+|---|---|---|---|
+| שופרסל | 413 "שופרסל ONLINE" (תת-רשת 2) | `PriceFull7290027600007-002-413-*.gz` | 15,899 |
+| קרפור | 471 "קרפור אונליין כפר סבא" | `PriceFull7290055700007-001-471-*.gz` | 9,847 |
+| רמי לוי | 039 "מרלוג אינטרנט" | `pricefull7290058140886-039-*.gz` | 15,571 |
+
+הרצה: `npm run ingest -- --chain shufersal --online` (או `carrefour`, `rami-levy`). עם `--online` נטענות רק חנויות שה-Stores מסמן כאונליין.
+
+דברים שנמצאו בבדיקה החיה:
+
+- **קרפור:** בתוך קובץ 471 השדה `StoreID` הוא 530. המערכת מקשרת לפי שם הקובץ (שמתאים ל-Stores) ומוסיפה הערה `STORE_ID_FROM_FILENAME` בדוח ההרצה.
+- **רמי לוי:** הקבצים נקראים `.gz` אבל הם בעצם ארכיוני ZIP. `decode.ts` מזהה ZIP לפי הבתים וקורא את הרשומה הראשונה. שמות הקבצים באותיות קטנות, וה-regex של `fileName.ts` לא רגיש לאותיות (יש בדיקה).
+- **ריפוד אפסים:** ב-XML של רמי לוי `StoreID` הוא `39` ו-`SubChainID` הוא `1`, ובקובץ Stores `039` ו-`001`. בזמן הטעינה משתמשים בכתיב של קובץ Stores כדי לא ליצור חנות כפולה.
+
+### אונליין מול סניפים פיזיים
+
+המחירים באונליין שונים מהסניפים, ולכן **לא משווים ביניהם**. `POST /basket/cheapest` וכלי ה-MCP `cheapest_basket` משווים רק בתוך אותה קבוצה:
+
+- ברירת מחדל: סניפים פיזיים בלבד.
+- `area.online: true` (ב-MCP: `online: true`): חנויות אונליין בלבד.
+- כל תוצאה כוללת `isOnline`.
+
+אפשר לשנות את ברירת המחדל במקום אחד: `StoreArea.online` ב-`repository.ts`.
+
+מה לא נעשה: קבצי PromoFull לא נטענים בפרויקט בכלל (הפרויקט קורא Price/PriceFull בלבד), גם לא של החנויות האונליין. הקבצים קיימים אצל שופרסל, וזה שלב נפרד. ויקטורי לא נגעו בו, עדיין לא נגיש.
+
+## דורש בדיקה חיה (לא אומת)
+
+1. **פורטל publishedprices:** רק `RamiLevi` נבדק. שאר שמות המשתמש ב-`src/downloader/registry.ts` (יוחננוף, אושר עד, טיב טעם, חצי חינם, סטופ מרקט, פוליצר, קשת, דור אלון) נכתבו מזיכרון ויש לאמת אחד-אחד.
+   סיסמה ריקה; ייתכנו רשתות עם סיסמה, captcha או חסימת קצב.
+2. **שופרסל:** `catID=2` (PriceFull), `catID=5` (Stores) ופגינציה אומתו חי. חייבים להשמיט `storeId=0` בבקשה לכל הסניפים. קטגוריות 1/3/4 נשארו לפי התיעוד הציבורי; הבקשות אליהן הגיעו ל-timeout ולא אומתו כאן. קישורי blob פגים אחרי כ-30 דקות, לכן מורידים מיד אחרי הרישום. ריצה מלאה ארוכה עלולה לחייב רענון קישורים.
+3. **ויקטורי:** מתאם `victory` ל-API הציבורי של Laibcatalog נכתב ונבדק עם mocks, אבל לא אומת חי: האתר וה-API הגיעו ל-timeout מהסביבה הזאת. אין כאן הוכחה שחסרים credentials. צריך להריץ את בדיקת המקור מסביבה עם גישה לשרת, לאמת את שני מזהי הרשת (`7290696200003`, `7290058103393`), מבנה JSON, נתיב ההורדה וקבצי PriceFull/Stores. מגה וסופר-פארם עדיין אינם ממומשים.
+4. **ChainId / SubChainId / StoreId:** בשופרסל נצפה `SubChainId=1` בקובץ Stores לעומת `001` בקובץ PriceFull. עדיין נשמרים הערכים המקוריים; צריך מדיניות איחוד מזהים לפני הסתמכות על חיבור הסניפים לחיפוש לפי אזור. כל רשת מדווחת אחרת (SubChainId `000`/`001`/ריק, StoreId עם אפסים מובילים, כמה ChainId לרשת אחת). המפתח לסניף כאן הוא `chain + subChain + store`. לבדוק שאין כפילות/פיצול סניפים.
+5. **שמות תגיות וקידודים:** נצפה בקבצים חיים `ManufactureName` (ולא `ManufacturerName`), `PriceUpdateTime`, UTF-8 עם BOM במחירים, UTF-16LE בקובץ סניפים, קובץ סניפים לא דחוס בפורטל. הפרסר מכיר וריאציות (`Prices/Products/Product`, `ManufacturerName`, windows-1255) אבל לא נבדק מול כל רשת.
+6. **שדה העיר:** גם קרפור ושופרסל מפרסמות קודים מספריים. ברמי לוי הוא קוד ישוב (`3000`). `area.text` עובד כרגע על טקסט (שם/כתובת/עיר), לכן צריך טבלת מיפוי קודי ישוב של הלמ"ס לשמות, אחרת חיפוש "ירושלים" לא ימצא סניפים שהעיר שלהם `3000`.
+7. **ספי fuzzy** (0.8 / 0.55) ושמירת הגודל: ערכי פתיחה בלבד. לכוון מול דגימה אמיתית דרך `/quality/review`.
+8. **pg_trgm:** נבדק עם Postgres 18 ועברית. ב-`postgres:16` של docker-compose צריך לוודא שההרחבה זמינה (היא חלק מ-contrib שבתמונה הרשמית) ולבדוק ביצועי אינדקס GIN על מיליוני מוצרים. `%` משתמש ב-`pg_trgm.similarity_threshold` של 0.3, כלומר אי אפשר להנמיך את `FUZZY_REVIEW_THRESHOLD` מתחת ל-0.3.
+9. **ביצועים:** הקליטה כרגע שורה-שורה (כ-300 מוצרים בשנייה). לכמות מלאה כדאי batch insert / `COPY` ומקביליות בין סניפים.
+10. **מבצעים (Promo/PromoFull):** לא נקלטים. המחיר הוא מחיר המדף בלבד.
+11. **מחירי משקל ותוצרת טרייה:** קודים פנימיים שונים בין רשתות. ההתאמה לפי שם עלולה לחבר מוצרים שונים. לבדוק ידנית.
+12. **תנאי שימוש וקצב:** לבדוק את תנאי השימוש של הפורטלים ולהגביל קצב; ה-User-Agent נקבע ב-`USER_AGENT`.
+
+## רישוי
+
+הקוד כאן נכתב מאפס ואינו מבוסס על קוד של פרויקט אחר. פורמט הקבצים נלמד מקבצים ציבוריים של הרשתות ומהתקנות השקיפות.

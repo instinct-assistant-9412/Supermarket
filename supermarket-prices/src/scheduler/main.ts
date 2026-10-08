@@ -1,0 +1,54 @@
+import cron from "node-cron";
+import { loadConfig } from "../config.js";
+import { createPool, migrate } from "../db/pool.js";
+import { PgRepository } from "../db/pgRepository.js";
+import { allSources } from "../downloader/registry.js";
+import { runDailyIngest } from "./dailyIngest.js";
+import { loadScheduleConfig } from "./schedule.js";
+
+const config = loadConfig();
+const sched = loadScheduleConfig();
+const pool = createPool(config.databaseUrl);
+const repo = new PgRepository(pool);
+const log = (line: string) => console.log(`${new Date().toISOString()} ${line}`);
+
+if (!cron.validate(sched.cron)) {
+  console.error(`invalid INGEST_CRON / INGEST_HOUR: "${sched.cron}"`);
+  process.exit(1);
+}
+
+let running = false;
+async function run(reason: string) {
+  if (running) {
+    log(`[scheduler] previous run still going, skipping (${reason})`);
+    return;
+  }
+  running = true;
+  log(`[scheduler] starting daily ingest (${reason})`);
+  try {
+    await runDailyIngest({
+      repo,
+      config,
+      sources: allSources({ userAgent: config.userAgent }),
+      retry: { attempts: sched.attempts, baseDelayMs: sched.baseDelayMs, factor: 4 },
+      log,
+    });
+  } catch (e) {
+    log(`[scheduler] run crashed: ${(e as Error).stack ?? e}`);
+  } finally {
+    running = false;
+  }
+}
+
+// the schema must exist before the first run (idempotent)
+await migrate(pool);
+cron.schedule(sched.cron, () => void run("schedule"), { timezone: sched.timezone });
+log(`[scheduler] up. cron="${sched.cron}" tz=${sched.timezone} attempts=${sched.attempts}`);
+if (sched.runOnStart) void run("run on start");
+
+for (const sig of ["SIGINT", "SIGTERM"] as const) {
+  process.on(sig, () => {
+    log(`[scheduler] ${sig}, shutting down`);
+    void pool.end().finally(() => process.exit(0));
+  });
+}

@@ -1,0 +1,55 @@
+import { Hono } from "hono";
+import { z } from "zod";
+import type { Config } from "../config.js";
+import { evaluateFreshness } from "../quality/checks.js";
+import { PriceService } from "../service.js";
+
+const basketSchema = z.object({
+  items: z.array(z.object({ gtin: z.string().optional(), query: z.string().optional(), qty: z.number().positive().optional() })
+    .refine((i) => i.gtin || i.query, "gtin or query required")).min(1).max(100),
+  area: z.object({
+    text: z.string().optional(),
+    chainIds: z.array(z.string()).optional(),
+    storeKeys: z.array(z.string()).optional(),
+    online: z.boolean().optional(),
+  }).default({}),
+  limit: z.number().int().min(1).max(50).optional(),
+  requireAll: z.boolean().optional(),
+});
+
+/** Hono was picked over Fastify: tiny, Web-standard Request/Response (easy to test with app.request), first-class TS types. */
+export function createApp(service: PriceService, config: Pick<Config, "maxFileAgeHours">) {
+  const app = new Hono();
+
+  app.get("/health", (c) => c.json({ ok: true }));
+
+  app.get("/products/search", async (c) => {
+    const q = c.req.query("q")?.trim();
+    if (!q) return c.json({ error: "q is required" }, 400);
+    const limit = Number(c.req.query("limit") ?? 20);
+    return c.json({ results: await service.searchProducts(q, Number.isFinite(limit) ? limit : 20) });
+  });
+
+  app.get("/products/:ref/history", async (c) => {
+    const ref = c.req.param("ref");
+    const isGtin = /^\d{8,14}$/.test(ref);
+    const days = c.req.query("days") ? Number(c.req.query("days")) : undefined;
+    const out = await service.priceHistory(
+      isGtin ? { gtin: ref } : /^\d+$/.test(ref) ? { id: Number(ref) } : { query: decodeURIComponent(ref) },
+      { chainId: c.req.query("chain") || undefined, storeKey: c.req.query("store") || undefined, days },
+    );
+    return out ? c.json(out) : c.json({ error: "product not found" }, 404);
+  });
+
+  app.post("/basket/cheapest", async (c) => {
+    const parsed = basketSchema.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return c.json({ error: "invalid body", details: parsed.error.flatten() }, 400);
+    const { items, area, limit, requireAll } = parsed.data;
+    return c.json(await service.cheapestBasket(items, area, { limit, requireAll }));
+  });
+
+  app.get("/quality/freshness", async (c) => c.json({ chains: evaluateFreshness(await service.freshness(), config) }));
+  app.get("/quality/review", async (c) => c.json({ items: await service.reviewQueue() }));
+
+  return app;
+}
