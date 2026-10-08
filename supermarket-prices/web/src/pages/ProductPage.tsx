@@ -1,3 +1,4 @@
+import { ProductImage } from "../components/ProductImage";
 import { useMemo, useState } from "react";
 import { PriceChart } from "../components/PriceChart";
 import { Empty, ErrorBox, Loading, ModeToggle, Qty } from "../components/ui";
@@ -56,9 +57,12 @@ export function ProductPage({ refId }: { refId: string }) {
     <section className="page">
       <a href="#/" className="back">← חזרה לחיפוש</a>
       <header className="product-head">
-        <div>
+        <div className="product-identity">
+          <ProductImage gtin={p.gtin} name={p.name} large />
+          <div>
           <h1>{p.name}</h1>
           <p className="muted small">{p.gtin ? `ברקוד ${p.gtin}` : "ללא ברקוד (קוד פנימי של רשת)"}</p>
+        </div>
         </div>
         <div className="add-row">
           <Qty value={qty} onChange={(n) => setQty(Math.max(1, n))} label={p.name} />

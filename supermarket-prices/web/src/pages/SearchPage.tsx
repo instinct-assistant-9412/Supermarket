@@ -1,3 +1,4 @@
+import { ProductImage } from "../components/ProductImage";
 import { useEffect, useState } from "react";
 import { productHref } from "../router";
 import { formatPrice } from "../format";
@@ -52,13 +53,14 @@ export function SearchPage() {
         <ul className="results" aria-label="תוצאות חיפוש">
           {data.map((p) => (
             <li key={p.id} className="card product-card">
-              <a className="product-link" href={productHref(p.id)}>
-                <span className="product-name">{p.name}</span>
+              <div className="product-link">
+                <ProductImage gtin={p.gtin} name={p.name} />
+                <span className="product-copy"><a className="product-name" href={productHref(p.id)}>{p.name}</a>
                 <span className="muted small">
                   {p.gtin ? `ברקוד ${p.gtin} · ` : ""}
                   {p.chains} רשתות
-                </span>
-              </a>
+                </span></span>
+              </div>
               <div className="price-range">
                 <span className="price-min">{formatPrice(p.minPrice)}</span>
                 {p.maxPrice !== null && p.maxPrice !== p.minPrice && <span className="muted small">עד {formatPrice(p.maxPrice)}</span>}
