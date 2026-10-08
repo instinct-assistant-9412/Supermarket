@@ -1,15 +1,14 @@
 import cron from "node-cron";
 import { loadConfig } from "../config.js";
-import { createPool, migrate } from "../db/pool.js";
-import { PgRepository } from "../db/pgRepository.js";
+import { openStorage } from "../db/storage.js";
 import { allSources } from "../downloader/registry.js";
 import { runDailyIngest } from "./dailyIngest.js";
 import { loadScheduleConfig } from "./schedule.js";
 
 const config = loadConfig();
 const sched = loadScheduleConfig();
-const pool = createPool(config.databaseUrl);
-const repo = new PgRepository(pool);
+const storage = await openStorage(config);
+const repo = storage.repo;
 const log = (line: string) => console.log(`${new Date().toISOString()} ${line}`);
 
 if (!cron.validate(sched.cron)) {
@@ -41,7 +40,7 @@ async function run(reason: string) {
 }
 
 // the schema must exist before the first run (idempotent)
-await migrate(pool);
+await storage.migrate();
 cron.schedule(sched.cron, () => void run("schedule"), { timezone: sched.timezone });
 log(`[scheduler] up. cron="${sched.cron}" tz=${sched.timezone} attempts=${sched.attempts}`);
 if (sched.runOnStart) void run("run on start");
@@ -49,6 +48,6 @@ if (sched.runOnStart) void run("run on start");
 for (const sig of ["SIGINT", "SIGTERM"] as const) {
   process.on(sig, () => {
     log(`[scheduler] ${sig}, shutting down`);
-    void pool.end().finally(() => process.exit(0));
+    void storage.close().finally(() => process.exit(0));
   });
 }

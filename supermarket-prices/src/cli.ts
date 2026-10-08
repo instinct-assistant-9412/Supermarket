@@ -1,6 +1,5 @@
 import { loadConfig } from "./config.js";
-import { createPool, migrate } from "./db/pool.js";
-import { PgRepository } from "./db/pgRepository.js";
+import { openStorage } from "./db/storage.js";
 import { allSources, sourceByKey } from "./downloader/registry.js";
 import { ingestSource } from "./ingest/ingest.js";
 import { evaluateFreshness } from "./quality/checks.js";
@@ -15,12 +14,12 @@ function flag(name: string): string | undefined {
 }
 
 async function main() {
-  const pool = createPool(config.databaseUrl);
-  const repo = new PgRepository(pool);
+  const storage = await openStorage(config);
+  const repo = storage.repo;
+  await storage.migrate(); // idempotent; sqlite: no-op (schema created on open)
   try {
     if (cmd === "migrate") {
-      await migrate(pool);
-      console.log("schema ready");
+      console.log(`schema ready (${storage.driver})`);
     } else if (cmd === "ingest") {
       const chain = flag("chain");
       const maxFiles = flag("max-files") ? Number(flag("max-files")) : undefined;
@@ -45,7 +44,7 @@ async function main() {
       console.log("usage: cli.ts migrate | ingest [--chain key] [--max-files N] [--kind pricefull|price] | quality");
     }
   } finally {
-    await pool.end();
+    await storage.close();
   }
 }
 

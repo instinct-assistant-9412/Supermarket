@@ -8,7 +8,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json && cp src/db/schema.sql dist/src/db/",
+    "build": "tsc -p tsconfig.json && cp src/db/*.sql dist/src/db/",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "migrate": "tsx src/cli.ts migrate",
@@ -18,11 +18,14 @@
     "mcp": "tsx src/mcp/server.ts",
     "mcp:http": "tsx src/mcp/httpServer.ts",
     "scheduler": "tsx src/scheduler/main.ts",
-    "ingest:all": "tsx src/scheduler/runOnce.ts"
+    "ingest:all": "tsx src/scheduler/runOnce.ts",
+    "web": "npm --prefix web run dev",
+    "web:mock": "npm --prefix web run dev:mock"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.0",
     "@modelcontextprotocol/sdk": "^1.0.0",
+    "better-sqlite3": "^11.10.0",
     "fast-xml-parser": "^4.5.0",
     "hono": "^4.6.0",
     "node-cron": "^3.0.3",
@@ -30,6 +33,7 @@
     "zod": "^3.23.0"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^22.0.0",
     "@types/node-cron": "^3.0.11",
     "@types/pg": "^8.11.0",

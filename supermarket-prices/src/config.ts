@@ -1,5 +1,9 @@
 export interface Config {
+  /** sqlite = הרצה מקומית בלי Postgres. pg = Postgres (production). */
+  dbDriver: "sqlite" | "pg";
   databaseUrl: string;
+  /** נתיב קובץ ה-SQLite (או :memory:) */
+  sqlitePath: string;
   apiPort: number;
   /** minimum trigram similarity for an automatic cross-chain name match */
   fuzzyAutoThreshold: number;
@@ -15,9 +19,18 @@ function num(v: string | undefined, d: number): number {
   return Number.isFinite(n) ? n : d;
 }
 
+function driverFrom(env: NodeJS.ProcessEnv): "sqlite" | "pg" {
+  const v = env.DB_DRIVER?.trim().toLowerCase();
+  if (v === "sqlite" || v === "pg") return v;
+  if (v) throw new Error(`DB_DRIVER must be "sqlite" or "pg" (got "${v}")`);
+  return env.DATABASE_URL ? "pg" : "sqlite";
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   return {
+    dbDriver: driverFrom(env),
     databaseUrl: env.DATABASE_URL ?? "postgres://prices:prices@localhost:5432/prices",
+    sqlitePath: env.SQLITE_PATH ?? "data/prices.db",
     apiPort: num(env.PORT, 3000),
     fuzzyAutoThreshold: num(env.FUZZY_AUTO_THRESHOLD, 0.8),
     fuzzyReviewThreshold: num(env.FUZZY_REVIEW_THRESHOLD, 0.55),
